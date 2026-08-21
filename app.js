@@ -34,16 +34,13 @@ let timerInterval = null;
 // MAPA
 // ======================================================
 
-// Posição inicial temporária.
-// Será substituída pela localização do usuário.
-
 const map = L.map("map").setView(
     [-23.5505, -46.6333],
     13
 );
 
 
-// Camada base OpenStreetMap
+// OPENSTREETMAP
 
 L.tileLayer(
 
@@ -61,19 +58,24 @@ L.tileLayer(
 ).addTo(map);
 
 
-// Marcador da posição atual
+// MARCADOR DA POSIÇÃO ATUAL
 
 let currentMarker = null;
 
 
-// Linha do trajeto
+// LINHA DO TRAJETO
 
 let trackLine = null;
 
 
-// Coordenadas usadas pelo Leaflet
+// COORDENADAS DO TRAJETO
 
 let trackCoordinates = [];
+
+
+// CAMADA EXTERNA
+
+let externalLayer = null;
 
 
 // ======================================================
@@ -83,69 +85,60 @@ let trackCoordinates = [];
 const statusElement =
     document.getElementById("status");
 
-
 const pointCountElement =
     document.getElementById("pointCount");
-
 
 const durationElement =
     document.getElementById("duration");
 
-
 const distanceElement =
     document.getElementById("distance");
-
 
 const accuracyElement =
     document.getElementById("accuracy");
 
-
 const latitudeElement =
     document.getElementById("latitude");
-
 
 const longitudeElement =
     document.getElementById("longitude");
 
-
 const startBtn =
     document.getElementById("startBtn");
-
 
 const pauseBtn =
     document.getElementById("pauseBtn");
 
-
 const stopBtn =
     document.getElementById("stopBtn");
-
 
 const metadataSection =
     document.getElementById("metadataSection");
 
-
 const exportSection =
     document.getElementById("exportSection");
-
 
 const descriptionInput =
     document.getElementById("description");
 
-
 const saveMetadataBtn =
     document.getElementById("saveMetadataBtn");
-
 
 const csvBtn =
     document.getElementById("csvBtn");
 
-
 const shpBtn =
     document.getElementById("shpBtn");
 
+const shpInput =
+    document.getElementById("shpInput");
+
+const removeLayerBtn =
+    document.getElementById("removeLayerBtn");
+
 
 // ======================================================
-// LOCALIZAR USUÁRIO AO ABRIR O APP
+// LOCALIZAR USUÁRIO
 // ======================================================
 
 function locateUser() {
@@ -167,10 +160,8 @@ function locateUser() {
             const latitude =
                 position.coords.latitude;
 
-
             const longitude =
                 position.coords.longitude;
-
 
             const accuracy =
                 position.coords.accuracy;
@@ -182,21 +173,15 @@ function locateUser() {
             ];
 
 
-            // Atualiza informações
-
             latitudeElement.textContent =
                 latitude.toFixed(7);
-
 
             longitudeElement.textContent =
                 longitude.toFixed(7);
 
-
             accuracyElement.textContent =
                 `± ${accuracy.toFixed(1)} m`;
 
-
-            // Centraliza o mapa
 
             map.setView(
                 latlng,
@@ -204,15 +189,15 @@ function locateUser() {
             );
 
 
-            // Cria marcador inicial
-
             if (currentMarker === null) {
 
                 currentMarker =
                     L.marker(latlng)
                         .addTo(map);
 
-            } else {
+            }
+
+            else {
 
                 currentMarker.setLatLng(
                     latlng
@@ -230,7 +215,6 @@ function locateUser() {
         function(error) {
 
             console.error(error);
-
 
             statusElement.textContent =
                 "Não foi possível obter a localização.";
@@ -259,8 +243,6 @@ function locateUser() {
 
 function startRecording() {
 
-    // Reinicia dados
-
     points = [];
 
     trackCoordinates = [];
@@ -276,20 +258,14 @@ function startRecording() {
     endTime = null;
 
 
-    // Remove linha anterior
-
     if (trackLine !== null) {
 
-        map.removeLayer(
-            trackLine
-        );
+        map.removeLayer(trackLine);
 
         trackLine = null;
 
     }
 
-
-    // Identificador da sessão
 
     trackId =
         "track_" +
@@ -314,31 +290,13 @@ function startRecording() {
     stopBtn.disabled = false;
 
 
-    metadataSection.classList.add(
-        "hidden"
-    );
+    metadataSection.classList.add("hidden");
 
-
-    exportSection.classList.add(
-        "hidden"
-    );
+    exportSection.classList.add("hidden");
 
 
     descriptionInput.value = "";
 
-
-    if (!navigator.geolocation) {
-
-        alert(
-            "Seu navegador não suporta geolocalização."
-        );
-
-        return;
-
-    }
-
-
-    // Inicia observação contínua
 
     watchId =
         navigator.geolocation.watchPosition(
@@ -384,42 +342,30 @@ function handlePosition(position) {
     const latitude =
         position.coords.latitude;
 
-
     const longitude =
         position.coords.longitude;
-
 
     const accuracy =
         position.coords.accuracy;
 
 
-    // Atualiza interface
-
     latitudeElement.textContent =
         latitude.toFixed(7);
 
-
     longitudeElement.textContent =
         longitude.toFixed(7);
-
 
     accuracyElement.textContent =
         `± ${accuracy.toFixed(1)} m`;
 
 
-    // --------------------------------------------------
     // DATA E HORA LOCAL
-    // --------------------------------------------------
 
     const date =
         new Date(position.timestamp);
 
-
     const dia =
-        date.toLocaleDateString(
-            "sv-SE"
-        );
-
+        date.toLocaleDateString("sv-SE");
 
     const hora =
         date.toLocaleTimeString(
@@ -430,9 +376,7 @@ function handlePosition(position) {
         );
 
 
-    // --------------------------------------------------
     // ATUALIZA MAPA
-    // --------------------------------------------------
 
     updateMap(
         latitude,
@@ -440,35 +384,27 @@ function handlePosition(position) {
     );
 
 
-    // --------------------------------------------------
-    // CRIA PONTO
-    // --------------------------------------------------
+    // NOVO PONTO
 
     const point = {
 
         id:
             points.length + 1,
 
-
         track_id:
             trackId,
-
 
         dia:
             dia,
 
-
         hora:
             hora,
-
 
         latitude:
             latitude,
 
-
         longitude:
             longitude,
-
 
         accuracy_m:
             accuracy
@@ -476,9 +412,7 @@ function handlePosition(position) {
     };
 
 
-    // --------------------------------------------------
-    // CALCULA DISTÂNCIA
-    // --------------------------------------------------
+    // DISTÂNCIA
 
     if (points.length > 0) {
 
@@ -502,17 +436,12 @@ function handlePosition(position) {
             );
 
 
-        totalDistance +=
-            distance;
+        totalDistance += distance;
 
     }
 
 
-    // Adiciona ponto
-
-    points.push(
-        point
-    );
+    points.push(point);
 
 
     updateInterface();
@@ -530,22 +459,15 @@ function updateMap(
 ) {
 
     const latlng = [
-
         latitude,
-
         longitude
-
     ];
 
-
-    // Adiciona ponto ao trajeto
 
     trackCoordinates.push(
         latlng
     );
 
-
-    // Atualiza marcador
 
     if (currentMarker === null) {
 
@@ -553,7 +475,9 @@ function updateMap(
             L.marker(latlng)
                 .addTo(map);
 
-    } else {
+    }
+
+    else {
 
         currentMarker.setLatLng(
             latlng
@@ -562,8 +486,6 @@ function updateMap(
     }
 
 
-    // Cria ou atualiza linha
-
     if (trackLine === null) {
 
         trackLine =
@@ -571,7 +493,9 @@ function updateMap(
                 trackCoordinates
             ).addTo(map);
 
-    } else {
+    }
+
+    else {
 
         trackLine.setLatLngs(
             trackCoordinates
@@ -580,9 +504,9 @@ function updateMap(
     }
 
 
-    // Centraliza no primeiro ponto gravado
-
-    if (trackCoordinates.length === 1) {
+    if (
+        trackCoordinates.length === 1
+    ) {
 
         map.setView(
             latlng,
@@ -606,10 +530,6 @@ function pauseRecording() {
 
     }
 
-
-    // --------------------------------------------------
-    // PAUSE
-    // --------------------------------------------------
 
     if (!isPaused) {
 
@@ -637,12 +557,9 @@ function pauseRecording() {
 
         }
 
+    }
 
-    // --------------------------------------------------
-    // RESUME
-    // --------------------------------------------------
-
-    } else {
+    else {
 
         isPaused = false;
 
@@ -745,10 +662,8 @@ function stopRecording() {
     startBtn.disabled =
         false;
 
-
     pauseBtn.disabled =
         true;
-
 
     stopBtn.disabled =
         true;
@@ -780,40 +695,8 @@ function handlePositionError(error) {
     );
 
 
-    let message =
-        "Não foi possível obter sua localização.";
-
-
-    switch (error.code) {
-
-        case error.PERMISSION_DENIED:
-
-            message =
-                "Permissão de localização negada.";
-
-            break;
-
-
-        case error.POSITION_UNAVAILABLE:
-
-            message =
-                "Posição indisponível.";
-
-            break;
-
-
-        case error.TIMEOUT:
-
-            message =
-                "Tempo esgotado ao tentar obter a posição.";
-
-            break;
-
-    }
-
-
     statusElement.textContent =
-        message;
+        "Erro ao obter localização.";
 
 }
 
@@ -826,14 +709,10 @@ function startTimer() {
 
     stopTimer();
 
-
     timerInterval =
         setInterval(
-
             updateInterface,
-
             1000
-
         );
 
 }
@@ -843,9 +722,7 @@ function stopTimer() {
 
     if (timerInterval !== null) {
 
-        clearInterval(
-            timerInterval
-        );
+        clearInterval(timerInterval);
 
         timerInterval = null;
 
@@ -855,7 +732,7 @@ function stopTimer() {
 
 
 // ======================================================
-// ATUALIZAR INTERFACE
+// INTERFACE
 // ======================================================
 
 function updateInterface() {
@@ -864,13 +741,9 @@ function updateInterface() {
         points.length;
 
 
-    const duration =
-        getElapsedTime();
-
-
     durationElement.textContent =
         formatDuration(
-            duration
+            getElapsedTime()
         );
 
 
@@ -879,7 +752,9 @@ function updateInterface() {
         distanceElement.textContent =
             `${totalDistance.toFixed(1)} m`;
 
-    } else {
+    }
+
+    else {
 
         distanceElement.textContent =
             `${(
@@ -922,7 +797,6 @@ function getElapsedTime() {
     ) {
 
         elapsed -=
-
             Date.now() -
             pauseStartTime;
 
@@ -938,31 +812,18 @@ function getElapsedTime() {
 // FORMATA DURAÇÃO
 // ======================================================
 
-function formatDuration(
-    milliseconds
-) {
+function formatDuration(milliseconds) {
 
     const totalSeconds =
-        Math.floor(
-            milliseconds / 1000
-        );
-
+        Math.floor(milliseconds / 1000);
 
     const hours =
-        Math.floor(
-            totalSeconds / 3600
-        );
-
+        Math.floor(totalSeconds / 3600);
 
     const minutes =
         Math.floor(
-
-            (
-                totalSeconds % 3600
-            ) / 60
-
+            (totalSeconds % 3600) / 60
         );
-
 
     const seconds =
         totalSeconds % 60;
@@ -995,8 +856,7 @@ function calculateDistance(
     lon2
 ) {
 
-    const R =
-        6371000;
+    const R = 6371000;
 
 
     const toRadians =
@@ -1005,26 +865,16 @@ function calculateDistance(
 
 
     const dLat =
-        toRadians(
-            lat2 - lat1
-        );
-
+        toRadians(lat2 - lat1);
 
     const dLon =
-        toRadians(
-            lon2 - lon1
-        );
+        toRadians(lon2 - lon1);
 
 
     const a =
 
-        Math.sin(
-            dLat / 2
-        ) *
-
-        Math.sin(
-            dLat / 2
-        )
+        Math.sin(dLat / 2) *
+        Math.sin(dLat / 2)
 
         +
 
@@ -1040,27 +890,16 @@ function calculateDistance(
 
         *
 
-        Math.sin(
-            dLon / 2
-        )
-
+        Math.sin(dLon / 2)
         *
-
-        Math.sin(
-            dLon / 2
-        );
+        Math.sin(dLon / 2);
 
 
     const c =
-
         2 *
-
         Math.atan2(
-
             Math.sqrt(a),
-
             Math.sqrt(1 - a)
-
         );
 
 
@@ -1078,7 +917,6 @@ function saveMetadata() {
     metadataSection.classList.add(
         "hidden"
     );
-
 
     exportSection.classList.remove(
         "hidden"
@@ -1124,18 +962,15 @@ function exportCSV() {
 
 
     const rows =
-
         points.map(
 
             point =>
 
                 headers
-
                     .map(
                         header =>
                             point[header]
                     )
-
                     .join(",")
 
         );
@@ -1164,20 +999,259 @@ function exportCSV() {
 
 
 // ======================================================
-// DOWNLOAD SHP
+// EXPORTAR SHAPEFILE
 // ======================================================
 
-function exportSHP() {
+async function exportSHP() {
 
-    alert(
-        "A exportação para Shapefile será implementada na próxima etapa."
-    );
+    if (points.length === 0) {
+
+        alert(
+            "Nenhum ponto foi registrado."
+        );
+
+        return;
+
+    }
+
+
+    const geojson = {
+
+        type:
+            "FeatureCollection",
+
+
+        features:
+
+            points.map(
+                point => ({
+
+                    type:
+                        "Feature",
+
+
+                    geometry: {
+
+                        type:
+                            "Point",
+
+
+                        coordinates: [
+
+                            point.longitude,
+
+                            point.latitude
+
+                        ]
+
+                    },
+
+
+                    properties: {
+
+                        id:
+                            point.id,
+
+                        track_id:
+                            point.track_id,
+
+                        dia:
+                            point.dia,
+
+                        hora:
+                            point.hora,
+
+                        latitude:
+                            point.latitude,
+
+                        longitude:
+                            point.longitude,
+
+                        accuracy_m:
+                            point.accuracy_m
+
+                    }
+
+                })
+            )
+
+    };
+
+
+    try {
+
+        const zipBlob =
+            await shpwrite.zip(
+
+                geojson,
+
+                {
+
+                    folder:
+                        "gps_track",
+
+                    filename:
+                        trackId,
+
+                    outputType:
+                        "blob"
+
+                }
+
+            );
+
+
+        const url =
+            URL.createObjectURL(
+                zipBlob
+            );
+
+
+        const link =
+            document.createElement("a");
+
+
+        link.href =
+            url;
+
+
+        link.download =
+            `${trackId}.zip`;
+
+
+        document.body.appendChild(
+            link
+        );
+
+
+        link.click();
+
+
+        document.body.removeChild(
+            link
+        );
+
+
+        URL.revokeObjectURL(
+            url
+        );
+
+
+        statusElement.textContent =
+            "Shapefile exportado.";
+
+    }
+
+    catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        alert(
+            "Erro ao gerar o Shapefile."
+        );
+
+    }
 
 }
 
 
 // ======================================================
-// DOWNLOAD DE ARQUIVOS
+// CARREGAR SHAPEFILE
+// ======================================================
+
+async function loadShapefile(event) {
+
+    const file =
+        event.target.files[0];
+
+
+    if (!file) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const buffer =
+            await file.arrayBuffer();
+
+
+        const geojson =
+            await shp(buffer);
+
+
+        if (externalLayer !== null) {
+
+            map.removeLayer(
+                externalLayer
+            );
+
+        }
+
+
+        externalLayer =
+            L.geoJSON(
+                geojson
+            ).addTo(map);
+
+
+        map.fitBounds(
+            externalLayer.getBounds()
+        );
+
+
+        statusElement.textContent =
+            "Camada adicionada.";
+
+    }
+
+    catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        alert(
+            "Erro ao carregar o Shapefile."
+        );
+
+    }
+
+}
+
+
+// ======================================================
+// REMOVER CAMADA EXTERNA
+// ======================================================
+
+function removeExternalLayer() {
+
+    if (externalLayer !== null) {
+
+        map.removeLayer(
+            externalLayer
+        );
+
+
+        externalLayer = null;
+
+
+        statusElement.textContent =
+            "Camada removida.";
+
+    }
+
+}
+
+
+// ======================================================
+// DOWNLOAD GENÉRICO
 // ======================================================
 
 function downloadFile(
@@ -1188,13 +1262,10 @@ function downloadFile(
 
     const blob =
         new Blob(
-
             [content],
-
             {
                 type: type
             }
-
         );
 
 
@@ -1205,14 +1276,11 @@ function downloadFile(
 
 
     const link =
-        document.createElement(
-            "a"
-        );
+        document.createElement("a");
 
 
     link.href =
         url;
-
 
     link.download =
         filename;
@@ -1243,61 +1311,55 @@ function downloadFile(
 // ======================================================
 
 startBtn.addEventListener(
-
     "click",
-
     startRecording
-
 );
 
 
 pauseBtn.addEventListener(
-
     "click",
-
     pauseRecording
-
 );
 
 
 stopBtn.addEventListener(
-
     "click",
-
     stopRecording
-
 );
 
 
 saveMetadataBtn.addEventListener(
-
     "click",
-
     saveMetadata
-
 );
 
 
 csvBtn.addEventListener(
-
     "click",
-
     exportCSV
-
 );
 
 
 shpBtn.addEventListener(
-
     "click",
-
     exportSHP
+);
 
+
+shpInput.addEventListener(
+    "change",
+    loadShapefile
+);
+
+
+removeLayerBtn.addEventListener(
+    "click",
+    removeExternalLayer
 );
 
 
 // ======================================================
-// INICIALIZA LOCALIZAÇÃO
+// INICIALIZA
 // ======================================================
 
 locateUser();

@@ -129,6 +129,33 @@ h1 {
 }
 
 
+.layer-controls {
+
+    margin-top: 15px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 10px;
+
+}
+
+
+.layer-controls label {
+
+    font-weight: bold;
+
+}
+
+
+.layer-controls input {
+
+    width: 100%;
+
+}
+
+
 .controls {
 
     display: grid;

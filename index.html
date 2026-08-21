@@ -14,7 +14,9 @@
 
     <link rel="stylesheet" href="style.css">
 
-    <!-- Leaflet -->
+
+    <!-- LEAFLET -->
+
     <link
         rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -22,6 +24,20 @@
 
     <script
         src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+    </script>
+
+
+    <!-- LEITURA DE SHAPEFILE -->
+
+    <script
+        src="https://unpkg.com/shpjs@latest/dist/shp.js">
+    </script>
+
+
+    <!-- GERAÇÃO DE SHAPEFILE -->
+
+    <script
+        src="https://unpkg.com/@mapbox/shp-write@latest/shpwrite.js">
     </script>
 
 </head>
@@ -138,7 +154,38 @@
                 Localização e trajeto
             </h2>
 
+
             <div id="map"></div>
+
+
+            <!-- CAMADA EXTERNA -->
+
+            <div class="layer-controls">
+
+                <label for="shpInput">
+
+                    Adicionar camada SHP
+
+                </label>
+
+
+                <input
+                    type="file"
+                    id="shpInput"
+                    accept=".zip"
+                >
+
+
+                <button
+                    id="removeLayerBtn"
+                    type="button"
+                >
+
+                    REMOVER CAMADA
+
+                </button>
+
+            </div>
 
         </section>
 
@@ -200,7 +247,7 @@
 
             <button id="saveMetadataBtn">
 
-                Confirmar descrição
+                CONFIRMAR DESCRIÇÃO
 
             </button>
 
