@@ -1,0 +1,155 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    background: #f4f4f4;
+
+    color: #222;
+}
+
+.container {
+    width: 100%;
+    max-width: 700px;
+
+    margin: auto;
+
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+
+    margin-bottom: 25px;
+}
+
+h1 {
+    margin-bottom: 5px;
+}
+
+#status {
+    color: #666;
+}
+
+
+.info-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, 1fr);
+
+    gap: 12px;
+
+    margin-bottom: 20px;
+}
+
+.card {
+    background: white;
+
+    padding: 18px;
+
+    border-radius: 10px;
+
+    text-align: center;
+}
+
+.label {
+    display: block;
+
+    font-size: 0.8rem;
+
+    color: #666;
+
+    margin-bottom: 8px;
+}
+
+.card strong {
+    font-size: 1.3rem;
+}
+
+
+.coordinates,
+.metadata,
+.export {
+    background: white;
+
+    padding: 20px;
+
+    border-radius: 10px;
+
+    margin-bottom: 20px;
+}
+
+
+.controls {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 10px;
+
+    margin-bottom: 20px;
+}
+
+button {
+    padding: 15px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    font-size: 1rem;
+
+    cursor: pointer;
+
+    background: #333;
+
+    color: white;
+}
+
+button:disabled {
+    opacity: 0.4;
+
+    cursor: not-allowed;
+}
+
+
+textarea {
+    width: 100%;
+
+    min-height: 120px;
+
+    padding: 10px;
+
+    margin-bottom: 10px;
+
+    font-family: inherit;
+
+    resize: vertical;
+}
+
+
+.hidden {
+    display: none;
+}
+
+
+@media (max-width: 500px) {
+
+    .container {
+        padding: 12px;
+    }
+
+    .controls {
+        grid-template-columns: 1fr;
+    }
+
+}
