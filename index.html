@@ -2,119 +2,234 @@
 <html lang="pt-BR">
 
 <head>
+
     <meta charset="UTF-8">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>GPS Web Logger</title>
 
     <link rel="stylesheet" href="style.css">
+
+    <!-- Leaflet -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+    </script>
+
 </head>
+
 
 <body>
 
     <main class="container">
 
         <header>
+
             <h1>GPS Web Logger</h1>
-            <p id="status">Pronto para iniciar</p>
+
+            <p id="status">
+                Obtendo localização...
+            </p>
+
         </header>
 
+
+        <!-- INFORMAÇÕES -->
 
         <section class="info-grid">
 
             <div class="card">
-                <span class="label">Pontos registrados</span>
-                <strong id="pointCount">0</strong>
+
+                <span class="label">
+                    Pontos registrados
+                </span>
+
+                <strong id="pointCount">
+                    0
+                </strong>
+
             </div>
 
-            <div class="card">
-                <span class="label">Duração</span>
-                <strong id="duration">00:00:00</strong>
-            </div>
 
             <div class="card">
-                <span class="label">Distância</span>
-                <strong id="distance">0 m</strong>
+
+                <span class="label">
+                    Duração
+                </span>
+
+                <strong id="duration">
+                    00:00:00
+                </strong>
+
             </div>
 
+
             <div class="card">
-                <span class="label">Precisão atual</span>
-                <strong id="accuracy">--</strong>
+
+                <span class="label">
+                    Distância
+                </span>
+
+                <strong id="distance">
+                    0 m
+                </strong>
+
+            </div>
+
+
+            <div class="card">
+
+                <span class="label">
+                    Precisão atual
+                </span>
+
+                <strong id="accuracy">
+                    --
+                </strong>
+
             </div>
 
         </section>
 
+
+        <!-- POSIÇÃO -->
 
         <section class="coordinates">
 
             <h2>Posição atual</h2>
 
             <p>
+
                 Latitude:
-                <span id="latitude">--</span>
+
+                <span id="latitude">
+                    --
+                </span>
+
             </p>
 
+
             <p>
+
                 Longitude:
-                <span id="longitude">--</span>
+
+                <span id="longitude">
+                    --
+                </span>
+
             </p>
 
         </section>
 
+
+        <!-- MAPA -->
+
+        <section class="map-section">
+
+            <h2>
+                Localização e trajeto
+            </h2>
+
+            <div id="map"></div>
+
+        </section>
+
+
+        <!-- CONTROLES -->
 
         <section class="controls">
 
             <button id="startBtn">
+
                 START
+
             </button>
 
-            <button id="pauseBtn"
-                    disabled>
+
+            <button
+                id="pauseBtn"
+                disabled
+            >
+
                 PAUSE
+
             </button>
 
-            <button id="stopBtn"
-                    disabled>
+
+            <button
+                id="stopBtn"
+                disabled
+            >
+
                 STOP
+
             </button>
 
         </section>
 
 
-        <section id="metadataSection"
-                 class="metadata hidden">
+        <!-- METADADOS -->
 
-            <h2>Trajeto finalizado</h2>
+        <section
+            id="metadataSection"
+            class="metadata hidden"
+        >
+
+            <h2>
+                Trajeto finalizado
+            </h2>
 
             <p>
                 Adicione uma descrição opcional do trajeto.
             </p>
+
 
             <textarea
                 id="description"
                 placeholder="Ex.: percurso realizado a pé pelo centro histórico..."
             ></textarea>
 
+
             <button id="saveMetadataBtn">
+
                 Confirmar descrição
+
             </button>
 
         </section>
 
 
-        <section id="exportSection"
-                 class="export hidden">
+        <!-- EXPORTAÇÃO -->
 
-            <h2>Exportar dados</h2>
+        <section
+            id="exportSection"
+            class="export hidden"
+        >
+
+            <h2>
+                Exportar dados
+            </h2>
+
 
             <button id="csvBtn">
-                Download CSV
+
+                DOWNLOAD CSV
+
             </button>
 
-            <button id="geojsonBtn">
-                Download GeoJSON
+
+            <button id="shpBtn">
+
+                DOWNLOAD SHP
+
             </button>
 
         </section>
