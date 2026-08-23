@@ -13,7 +13,7 @@
     <title>GPS Web Logger</title>
 
 
-    <!-- CSS DO APP -->
+    <!-- CSS DO APLICATIVO -->
 
     <link
         rel="stylesheet"
@@ -44,6 +44,7 @@
 
 <body>
 
+
     <!-- MAPA -->
 
     <div id="map"></div>
@@ -59,6 +60,7 @@
 
 
         <div class="infoRow">
+
 
             <div>
 
@@ -98,17 +100,19 @@
 
             </div>
 
+
         </div>
 
 
         <div class="gpsInfo">
 
-            <span>
-                Precisão:
-                <strong id="accuracy">--</strong>
-            </span>
+            Precisão:
+            <strong id="accuracy">
+                --
+            </strong>
 
         </div>
+
 
     </div>
 
@@ -116,6 +120,7 @@
     <!-- CONTROLES INFERIORES -->
 
     <div id="controls">
+
 
         <button id="startBtn">
 
@@ -143,10 +148,11 @@
 
         </button>
 
+
     </div>
 
 
-    <!-- METADADOS -->
+    <!-- MODAL DE METADADOS -->
 
     <div
         id="metadataPanel"
@@ -155,15 +161,14 @@
 
         <div class="modalContent">
 
+
             <h2>
                 Trajeto finalizado
             </h2>
 
 
             <p>
-
                 Adicione uma descrição opcional.
-
             </p>
 
 
@@ -179,12 +184,13 @@
 
             </button>
 
+
         </div>
 
     </div>
 
 
-    <!-- EXPORTAÇÃO -->
+    <!-- MODAL DE EXPORTAÇÃO -->
 
     <div
         id="exportPanel"
@@ -192,6 +198,7 @@
     >
 
         <div class="modalContent">
+
 
             <h2>
                 Exportar dados
@@ -211,12 +218,16 @@
 
             </button>
 
+
         </div>
 
     </div>
 
 
+    <!-- SCRIPT PRINCIPAL -->
+
     <script src="app.js"></script>
+
 
 </body>
 

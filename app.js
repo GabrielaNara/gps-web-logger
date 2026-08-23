@@ -64,9 +64,17 @@ L.tileLayer(
 ).addTo(map);
 
 
+// MARCADOR DA POSIÇÃO ATUAL
+
 let currentMarker = null;
 
+
+// LINHA DO TRAJETO
+
 let trackLine = null;
+
+
+// COORDENADAS DA LINHA
 
 let trackCoordinates = [];
 
@@ -76,19 +84,21 @@ let trackCoordinates = [];
 // ======================================================
 
 const predefinedLayers = [
+
     {
         name: "Pontos de referência",
-        file: "layers/teste_edificacao.geojson"
+        file: "./layers/pontos.geojson"
+    },
+    {
+        name: "Poligono",
+        file: "./layers/teste_edificacao.geojson"
     }
-    /*
-    { name: "Área de estudo",file: "layers/area_estudo.geojson"}
-    */
 
 ];
 
 
 // ======================================================
-// ELEMENTOS
+// ELEMENTOS HTML
 // ======================================================
 
 const statusElement =
@@ -135,48 +145,129 @@ const shpBtn =
 
 
 // ======================================================
-// CARREGAR CAMADAS
+// CARREGAR CAMADAS PREDEFINIDAS
 // ======================================================
 
-function loadPredefinedLayers() {
+async function loadPredefinedLayers() {
 
-    predefinedLayers.forEach(
-        async layerConfig => {
+    for (
 
-            try {
+        const layerConfig
+        of predefinedLayers
 
-                const response =
-                    await fetch(
-                        layerConfig.file
-                    );
+    ) {
 
+        try {
 
-                const geojson =
-                    await response.json();
-
-
-                L.geoJSON(
-                    geojson
-                ).addTo(map);
+            const response =
+                await fetch(
+                    layerConfig.file
+                );
 
 
-                console.log(
-                    `Camada carregada: ${layerConfig.name}`
+            if (!response.ok) {
+
+                throw new Error(
+
+                    `HTTP ${response.status}: ` +
+                    layerConfig.file
+
                 );
 
             }
 
-            catch (error) {
 
-                console.error(
-                    `Erro ao carregar camada: ${layerConfig.name}`,
-                    error
+            const geojson =
+                await response.json();
+
+
+            const layer =
+                L.geoJSON(
+
+                    geojson,
+
+                    {
+
+                        pointToLayer:
+
+                            function (
+                                feature,
+                                latlng
+                            ) {
+
+                                return L.circleMarker(
+
+                                    latlng,
+
+                                    {
+
+                                        radius: 7,
+
+                                        weight: 2,
+
+                                        fillOpacity: 0.8
+
+                                    }
+
+                                );
+
+                            }
+
+                    }
+
+                ).addTo(map);
+
+
+            console.log(
+
+                `Camada carregada: ` +
+                layerConfig.name
+
+            );
+
+
+            // Para teste:
+            // ajusta o mapa para mostrar a camada.
+
+            if (
+
+                layer
+                    .getBounds()
+                    .isValid()
+
+            ) {
+
+                map.fitBounds(
+
+                    layer.getBounds(),
+
+                    {
+
+                        padding:
+                            [40, 40]
+
+                    }
+
                 );
 
             }
 
         }
-    );
+
+        catch (error) {
+
+            console.error(
+
+                `ERRO ao carregar ` +
+                `"${layerConfig.name}":`,
+
+                error
+
+            );
+
+        }
+
+    }
 
 }
 
@@ -219,7 +310,7 @@ function locateUser() {
 
 
 // ======================================================
-// RECEBER GPS
+// RECEBER POSIÇÃO GPS
 // ======================================================
 
 function receivePosition(position) {
@@ -240,7 +331,7 @@ function receivePosition(position) {
 
 
 // ======================================================
-// ATUALIZAR POSIÇÃO VISUAL
+// ATUALIZAR POSIÇÃO NO MAPA
 // ======================================================
 
 function updateCurrentPosition(position) {
@@ -256,8 +347,11 @@ function updateCurrentPosition(position) {
 
 
     const latlng = [
+
         latitude,
+
         longitude
+
     ];
 
 
@@ -330,10 +424,15 @@ function startRecording() {
 
 
     trackId =
+
         "track_" +
+
         new Date(startTime)
             .toISOString()
-            .replace(/[:.]/g, "-");
+            .replace(
+                /[:.]/g,
+                "-"
+            );
 
 
     isRecording = true;
@@ -345,46 +444,19 @@ function startRecording() {
         "Gravando...";
 
 
-    startBtn.disabled = true;
+    startBtn.disabled =
+        true;
 
-    pauseBtn.disabled = false;
+    pauseBtn.disabled =
+        false;
 
-    stopBtn.disabled = false;
-
-
-    // GPS CONTÍNUO
-
-    watchId =
-        navigator.geolocation.watchPosition(
-
-            receivePosition,
-
-            handlePositionError,
-
-            {
-
-                enableHighAccuracy: true,
-
-                maximumAge: 0,
-
-                timeout: 10000
-
-            }
-
-        );
+    stopBtn.disabled =
+        false;
 
 
-    // REGISTRO EXATAMENTE A CADA SEGUNDO
+    startGPSWatch();
 
-    recordingInterval =
-        setInterval(
-
-            recordSecond,
-
-            1000
-
-        );
-
+    startRecordingInterval();
 
     startTimer();
 
@@ -392,14 +464,17 @@ function startRecording() {
 
 
 // ======================================================
-// REGISTRAR UM SEGUNDO
+// REGISTRAR UM REGISTRO POR SEGUNDO
 // ======================================================
 
 function recordSecond() {
 
     if (
+
         !isRecording ||
+
         isPaused
+
     ) {
 
         return;
@@ -411,20 +486,26 @@ function recordSecond() {
         new Date();
 
 
-    // DATA LOCAL
-
     const dia =
+
         now.toLocaleDateString(
             "sv-SE"
         );
 
 
     const hora =
+
         now.toLocaleTimeString(
+
             "pt-BR",
+
             {
-                hour12: false
+
+                hour12:
+                    false
+
             }
+
         );
 
 
@@ -441,16 +522,20 @@ function recordSecond() {
     let gpsAvailable = 0;
 
 
-    // Considera posição válida se recebida
-    // nos últimos 2 segundos
+    // Considera o GPS disponível
+    // somente se uma posição foi recebida
+    // nos últimos 2 segundos.
 
     const positionIsRecent =
 
         lastPosition !== null &&
 
         (
+
             Date.now() -
+
             lastPositionReceivedAt
+
         )
 
         <= 2000;
@@ -471,8 +556,11 @@ function recordSecond() {
 
 
         updateTrack(
+
             latitude,
+
             longitude
+
         );
 
     }
@@ -481,40 +569,55 @@ function recordSecond() {
     const point = {
 
         id:
+
             points.length + 1,
 
+
         track_id:
+
             trackId,
 
+
         timestamp:
+
             timestamp,
 
+
         dia:
+
             dia,
 
+
         hora:
+
             hora,
 
+
         latitude:
+
             latitude,
 
+
         longitude:
+
             longitude,
 
+
         accuracy_m:
+
             accuracy,
 
+
         gps_available:
+
             gpsAvailable
 
     };
 
 
-    // DISTÂNCIA
+    // CALCULAR DISTÂNCIA
 
-    if (
-        gpsAvailable === 1
-    ) {
+    if (gpsAvailable === 1) {
 
         const previousValidPoint =
             findPreviousValidPoint();
@@ -557,7 +660,7 @@ function recordSecond() {
 
 
 // ======================================================
-// ENCONTRAR ÚLTIMO PONTO VÁLIDO
+// ENCONTRAR O ÚLTIMO PONTO GPS VÁLIDO
 // ======================================================
 
 function findPreviousValidPoint() {
@@ -575,7 +678,8 @@ function findPreviousValidPoint() {
 
         if (
 
-            points[i].gps_available === 1
+            points[i]
+                .gps_available === 1
 
         ) {
 
@@ -592,7 +696,7 @@ function findPreviousValidPoint() {
 
 
 // ======================================================
-// ATUALIZAR TRAJETO
+// ATUALIZAR LINHA DO TRAJETO
 // ======================================================
 
 function updateTrack(
@@ -601,8 +705,11 @@ function updateTrack(
 ) {
 
     const latlng = [
+
         latitude,
+
         longitude
+
     ];
 
 
@@ -614,9 +721,12 @@ function updateTrack(
     if (trackLine === null) {
 
         trackLine =
+
             L.polyline(
                 trackCoordinates
-            ).addTo(map);
+            )
+
+            .addTo(map);
 
     }
 
@@ -674,6 +784,7 @@ function pauseRecording() {
         elapsedBeforePause +=
 
             Date.now() -
+
             pauseStartTime;
 
 
@@ -698,7 +809,7 @@ function pauseRecording() {
 
 
 // ======================================================
-// PARAR
+// STOP
 // ======================================================
 
 function stopRecording() {
@@ -714,7 +825,8 @@ function stopRecording() {
         Date.now();
 
 
-    isRecording = false;
+    isRecording =
+        false;
 
 
     stopGPSWatch();
@@ -725,19 +837,24 @@ function stopRecording() {
 
 
     if (
+
         isPaused &&
+
         pauseStartTime !== null
+
     ) {
 
         elapsedBeforePause +=
 
             endTime -
+
             pauseStartTime;
 
     }
 
 
-    isPaused = false;
+    isPaused =
+        false;
 
 
     statusElement.textContent =
@@ -775,6 +892,7 @@ function stopRecording() {
 function startGPSWatch() {
 
     watchId =
+
         navigator.geolocation.watchPosition(
 
             receivePosition,
@@ -783,11 +901,14 @@ function startGPSWatch() {
 
             {
 
-                enableHighAccuracy: true,
+                enableHighAccuracy:
+                    true,
 
-                maximumAge: 0,
+                maximumAge:
+                    0,
 
-                timeout: 10000
+                timeout:
+                    10000
 
             }
 
@@ -818,9 +939,13 @@ function stopGPSWatch() {
 function startRecordingInterval() {
 
     recordingInterval =
+
         setInterval(
+
             recordSecond,
+
             1000
+
         );
 
 }
@@ -853,6 +978,7 @@ function startTimer() {
 
 
     timerInterval =
+
         setInterval(
 
             updateInterface,
@@ -905,13 +1031,17 @@ function getElapsedTime() {
 
 
     if (
+
         isPaused &&
+
         pauseStartTime !== null
+
     ) {
 
         elapsed -=
 
             Date.now() -
+
             pauseStartTime;
 
     }
@@ -933,14 +1063,18 @@ function updateInterface() {
 
 
     durationElement.textContent =
+
         formatDuration(
+
             getElapsedTime()
+
         );
 
 
     if (totalDistance < 1000) {
 
         distanceElement.textContent =
+
             `${totalDistance.toFixed(1)} m`;
 
     }
@@ -948,8 +1082,11 @@ function updateInterface() {
     else {
 
         distanceElement.textContent =
+
             `${(
+
                 totalDistance / 1000
+
             ).toFixed(2)} km`;
 
     }
@@ -964,18 +1101,21 @@ function updateInterface() {
 function formatDuration(milliseconds) {
 
     const totalSeconds =
+
         Math.floor(
             milliseconds / 1000
         );
 
 
     const hours =
+
         Math.floor(
             totalSeconds / 3600
         );
 
 
     const minutes =
+
         Math.floor(
 
             (
@@ -992,13 +1132,22 @@ function formatDuration(milliseconds) {
     return [
 
         String(hours)
-            .padStart(2, "0"),
+            .padStart(
+                2,
+                "0"
+            ),
 
         String(minutes)
-            .padStart(2, "0"),
+            .padStart(
+                2,
+                "0"
+            ),
 
         String(seconds)
-            .padStart(2, "0")
+            .padStart(
+                2,
+                "0"
+            )
 
     ].join(":");
 
@@ -1006,7 +1155,7 @@ function formatDuration(milliseconds) {
 
 
 // ======================================================
-// HAVERSINE
+// CÁLCULO DE DISTÂNCIA - HAVERSINE
 // ======================================================
 
 function calculateDistance(
@@ -1021,17 +1170,23 @@ function calculateDistance(
 
 
     const toRadians =
+
         value =>
-            value * Math.PI / 180;
+
+            value *
+            Math.PI /
+            180;
 
 
     const dLat =
+
         toRadians(
             lat2 - lat1
         );
 
 
     const dLon =
+
         toRadians(
             lon2 - lon1
         );
@@ -1063,13 +1218,16 @@ function calculateDistance(
 
 
     const c =
+
         2 *
 
         Math.atan2(
 
             Math.sqrt(a),
 
-            Math.sqrt(1 - a)
+            Math.sqrt(
+                1 - a
+            )
 
         );
 
@@ -1080,7 +1238,7 @@ function calculateDistance(
 
 
 // ======================================================
-// ERRO GPS
+// ERRO DE GEOLOCALIZAÇÃO
 // ======================================================
 
 function handlePositionError(error) {
@@ -1091,9 +1249,7 @@ function handlePositionError(error) {
     );
 
 
-    if (
-        isRecording
-    ) {
+    if (isRecording) {
 
         statusElement.textContent =
             "GPS temporariamente indisponível";
@@ -1111,13 +1267,15 @@ function handlePositionError(error) {
 
 
 // ======================================================
-// METADADOS
+// SALVAR METADADOS
 // ======================================================
 
 function saveMetadata() {
 
     description =
-        descriptionInput.value.trim();
+        descriptionInput
+            .value
+            .trim();
 
 
     metadataPanel.classList.add(
@@ -1173,6 +1331,7 @@ function exportCSV() {
 
 
     const rows =
+
         points.map(
 
             point =>
@@ -1183,7 +1342,9 @@ function exportCSV() {
 
                         point[header] ?? ""
 
-                ).join(",")
+                )
+
+                .join(",")
 
         );
 
@@ -1203,7 +1364,7 @@ function exportCSV() {
 
         `${trackId}.csv`,
 
-        "text/csv"
+        "text/csv;charset=utf-8"
 
     );
 
@@ -1217,17 +1378,17 @@ function exportCSV() {
 async function exportSHP() {
 
     const validPoints =
+
         points.filter(
 
             point =>
+
                 point.gps_available === 1
 
         );
 
 
-    if (
-        validPoints.length === 0
-    ) {
+    if (validPoints.length === 0) {
 
         alert(
             "Nenhum ponto GPS válido foi registrado."
@@ -1243,6 +1404,7 @@ async function exportSHP() {
         type:
             "FeatureCollection",
 
+
         features:
 
             validPoints.map(
@@ -1252,10 +1414,12 @@ async function exportSHP() {
                     type:
                         "Feature",
 
+
                     geometry: {
 
                         type:
                             "Point",
+
 
                         coordinates: [
 
@@ -1266,6 +1430,7 @@ async function exportSHP() {
                         ]
 
                     },
+
 
                     properties: {
 
@@ -1302,6 +1467,7 @@ async function exportSHP() {
     try {
 
         const zipBlob =
+
             await shpwrite.zip(
 
                 geojson,
@@ -1353,7 +1519,7 @@ async function exportSHP() {
 
 
 // ======================================================
-// DOWNLOAD
+// DOWNLOAD DE ARQUIVO
 // ======================================================
 
 function downloadFile(
@@ -1363,6 +1529,7 @@ function downloadFile(
 ) {
 
     const blob =
+
         new Blob(
 
             [content],
@@ -1388,12 +1555,14 @@ function downloadBlob(
 ) {
 
     const url =
+
         URL.createObjectURL(
             blob
         );
 
 
     const link =
+
         document.createElement(
             "a"
         );
@@ -1401,6 +1570,7 @@ function downloadBlob(
 
     link.href =
         url;
+
 
     link.download =
         filename;
