@@ -4,7 +4,15 @@
 
 
 // ======================================================
-// ESTADO DA APLICAÇÃO
+// CHAVES DO LOCALSTORAGE
+// ======================================================
+
+const STORAGE_KEY =
+    "gps_web_logger_track";
+
+
+// ======================================================
+// ESTADO
 // ======================================================
 
 let points = [];
@@ -37,6 +45,12 @@ let totalDistance = 0;
 
 let description = "";
 
+let trackCoordinates = [];
+
+let trackLine = null;
+
+let currentMarker = null;
+
 
 // ======================================================
 // MAPA
@@ -49,34 +63,13 @@ const map = L.map("map").setView(
 
 
 L.tileLayer(
-
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-
     {
-
         maxZoom: 19,
-
         attribution:
             "&copy; OpenStreetMap contributors"
-
     }
-
 ).addTo(map);
-
-
-// MARCADOR DA POSIÇÃO ATUAL
-
-let currentMarker = null;
-
-
-// LINHA DO TRAJETO
-
-let trackLine = null;
-
-
-// COORDENADAS DA LINHA
-
-let trackCoordinates = [];
 
 
 // ======================================================
@@ -89,8 +82,9 @@ const predefinedLayers = [
         name: "Pontos de referência",
         file: "./layers/pontos.geojson"
     },
+
     {
-        name: "Poligono",
+        name: "Polígono",
         file: "./layers/teste_edificacao.geojson"
     }
 
@@ -140,9 +134,215 @@ const csvBtn =
 const shpBtn =
     document.getElementById("shpBtn");
 
+const newTrackBtn =
+    document.getElementById("newTrackBtn");
+
 
 // ======================================================
-// CARREGAR CAMADAS PREDEFINIDAS
+// SALVAR ESTADO
+// ======================================================
+
+function saveState() {
+
+    const state = {
+
+        points:
+            points,
+
+        trackId:
+            trackId,
+
+        startTime:
+            startTime,
+
+        endTime:
+            endTime,
+
+        elapsedBeforePause:
+            elapsedBeforePause,
+
+        pauseStartTime:
+            pauseStartTime,
+
+        totalDistance:
+            totalDistance,
+
+        description:
+            description,
+
+        trackCoordinates:
+            trackCoordinates,
+
+        isRecording:
+            isRecording,
+
+        isPaused:
+            isPaused
+
+    };
+
+
+    localStorage.setItem(
+
+        STORAGE_KEY,
+
+        JSON.stringify(state)
+
+    );
+
+}
+
+
+// ======================================================
+// RESTAURAR ESTADO
+// ======================================================
+
+function restoreState() {
+
+    const savedState =
+        localStorage.getItem(
+            STORAGE_KEY
+        );
+
+
+    if (!savedState) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const state =
+            JSON.parse(
+                savedState
+            );
+
+
+        points =
+            state.points || [];
+
+
+        trackId =
+            state.trackId;
+
+
+        startTime =
+            state.startTime;
+
+
+        endTime =
+            state.endTime;
+
+
+        elapsedBeforePause =
+            state.elapsedBeforePause || 0;
+
+
+        pauseStartTime =
+            state.pauseStartTime;
+
+
+        totalDistance =
+            state.totalDistance || 0;
+
+
+        description =
+            state.description || "";
+
+
+        trackCoordinates =
+            state.trackCoordinates || [];
+
+
+        isRecording =
+            false;
+
+
+        isPaused =
+            false;
+
+
+        // RESTAURAR LINHA
+
+        if (
+
+            trackCoordinates.length > 0
+
+        ) {
+
+            trackLine =
+                L.polyline(
+                    trackCoordinates
+                ).addTo(map);
+
+
+            map.fitBounds(
+                trackLine.getBounds(),
+                {
+                    padding: [40, 40]
+                }
+            );
+
+        }
+
+
+        // SE HOUVER TRAJETO FINALIZADO
+
+        if (
+
+            endTime !== null
+
+        ) {
+
+            statusElement.textContent =
+                "Trajeto restaurado";
+
+
+            startBtn.disabled =
+                false;
+
+            pauseBtn.disabled =
+                true;
+
+            stopBtn.disabled =
+                true;
+
+        }
+
+
+        updateInterface();
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Erro ao restaurar trajeto:",
+            error
+        );
+
+    }
+
+}
+
+
+// ======================================================
+// LIMPAR ESTADO
+// ======================================================
+
+function clearState() {
+
+    localStorage.removeItem(
+        STORAGE_KEY
+    );
+
+}
+
+
+// ======================================================
+// CARREGAR CAMADAS GEOJSON
 // ======================================================
 
 async function loadPredefinedLayers() {
@@ -178,40 +378,58 @@ async function loadPredefinedLayers() {
                 await response.json();
 
 
-            const layer = L.geoJSON(
-                    geojson,
-                    {
+            L.geoJSON(
 
-                        style: {
-                            weight: 2,
-                            fillOpacity: 0.15
-                        },
+                geojson,
+
+                {
+
+                    style: {
+
+                        weight: 2,
+
+                        fillOpacity: 0.15
+
+                    },
 
 
-                        pointToLayer: function (
+                    pointToLayer:
+
+                        function (
                             feature,
                             latlng
                         ) {
 
                             return L.circleMarker(
+
                                 latlng,
+
                                 {
+
                                     radius: 7,
+
                                     weight: 2,
+
                                     fillOpacity: 0.8
+
                                 }
+
                             );
 
                         },
 
 
-                        onEachFeature: function (
+                    onEachFeature:
+
+                        function (
                             feature,
                             leafletLayer
                         ) {
 
                             if (
+
                                 feature.properties
+
                             ) {
 
                                 let popupContent =
@@ -219,17 +437,29 @@ async function loadPredefinedLayers() {
 
 
                                 for (
+
                                     const [key, value]
+
                                     of Object.entries(
+
                                         feature.properties
+
                                     )
+
                                 ) {
 
                                     popupContent += `
+
                                         <div class="popupRow">
-                                            <strong>${key}:</strong>
+
+                                            <strong>
+                                                ${key}
+                                            </strong>
+
                                             ${value}
+
                                         </div>
+
                                     `;
 
                                 }
@@ -247,43 +477,14 @@ async function loadPredefinedLayers() {
 
                         }
 
-                    }
-                ).addTo(map);
+                }
+
+            ).addTo(map);
 
 
             console.log(
-
-                `Camada carregada: ` +
-                layerConfig.name
-
+                `Camada carregada: ${layerConfig.name}`
             );
-
-
-            // Para teste:
-            // ajusta o mapa para mostrar a camada.
-
-            if (
-
-                layer
-                    .getBounds()
-                    .isValid()
-
-            ) {
-
-                map.fitBounds(
-
-                    layer.getBounds(),
-
-                    {
-
-                        padding:
-                            [40, 40]
-
-                    }
-
-                );
-
-            }
 
         }
 
@@ -291,8 +492,7 @@ async function loadPredefinedLayers() {
 
             console.error(
 
-                `ERRO ao carregar ` +
-                `"${layerConfig.name}":`,
+                `Erro ao carregar ${layerConfig.name}:`,
 
                 error
 
@@ -343,10 +543,78 @@ function locateUser() {
 
 
 // ======================================================
-// RECEBER POSIÇÃO GPS
+// ATUALIZAR POSIÇÃO
 // ======================================================
 
-function receivePosition(position) {
+function updateCurrentPosition(
+    position
+) {
+
+    const latitude =
+        position.coords.latitude;
+
+    const longitude =
+        position.coords.longitude;
+
+    const accuracy =
+        position.coords.accuracy;
+
+
+    const latlng = [
+        latitude,
+        longitude
+    ];
+
+
+    accuracyElement.textContent =
+        `± ${accuracy.toFixed(1)} m`;
+
+
+    if (
+
+        currentMarker === null
+
+    ) {
+
+        currentMarker =
+            L.marker(
+                latlng
+            ).addTo(map);
+
+
+        if (
+
+            trackCoordinates.length === 0
+
+        ) {
+
+            map.setView(
+                latlng,
+                17
+            );
+
+        }
+
+    }
+
+    else {
+
+        currentMarker.setLatLng(
+            latlng
+        );
+
+    }
+
+}
+
+
+// ======================================================
+// RECEBER GPS
+// ======================================================
+
+function receivePosition(
+    position
+) {
 
     lastPosition =
         position;
@@ -364,64 +632,12 @@ function receivePosition(position) {
 
 
 // ======================================================
-// ATUALIZAR POSIÇÃO NO MAPA
-// ======================================================
-
-function updateCurrentPosition(position) {
-
-    const latitude =
-        position.coords.latitude;
-
-    const longitude =
-        position.coords.longitude;
-
-    const accuracy =
-        position.coords.accuracy;
-
-
-    const latlng = [
-
-        latitude,
-
-        longitude
-
-    ];
-
-
-    accuracyElement.textContent =
-        `± ${accuracy.toFixed(1)} m`;
-
-
-    if (currentMarker === null) {
-
-        currentMarker =
-            L.marker(latlng)
-                .addTo(map);
-
-
-        map.setView(
-            latlng,
-            17
-        );
-
-    }
-
-    else {
-
-        currentMarker.setLatLng(
-            latlng
-        );
-
-    }
-
-}
-
-
-// ======================================================
 // START
 // ======================================================
 
 function startRecording() {
+
+    // NOVO TRAJETO
 
     points = [];
 
@@ -439,13 +655,16 @@ function startRecording() {
 
     endTime = null;
 
-
     lastPosition = null;
 
     lastPositionReceivedAt = null;
 
 
-    if (trackLine !== null) {
+    if (
+
+        trackLine !== null
+
+    ) {
 
         map.removeLayer(
             trackLine
@@ -460,17 +679,23 @@ function startRecording() {
 
         "track_" +
 
-        new Date(startTime)
-            .toISOString()
-            .replace(
-                /[:.]/g,
-                "-"
-            );
+        new Date(
+            startTime
+        )
+
+        .toISOString()
+
+        .replace(
+            /[:.]/g,
+            "-"
+        );
 
 
-    isRecording = true;
+    isRecording =
+        true;
 
-    isPaused = false;
+    isPaused =
+        false;
 
 
     statusElement.textContent =
@@ -493,11 +718,13 @@ function startRecording() {
 
     startTimer();
 
+    saveState();
+
 }
 
 
 // ======================================================
-// REGISTRAR UM REGISTRO POR SEGUNDO
+// REGISTRAR A CADA SEGUNDO
 // ======================================================
 
 function recordSecond() {
@@ -529,21 +756,11 @@ function recordSecond() {
     const hora =
 
         now.toLocaleTimeString(
-
             "pt-BR",
-
             {
-
-                hour12:
-                    false
-
+                hour12: false
             }
-
         );
-
-
-    const timestamp =
-        now.getTime();
 
 
     let latitude = null;
@@ -555,13 +772,11 @@ function recordSecond() {
     let gpsAvailable = 0;
 
 
-    // Considera o GPS disponível
-    // somente se uma posição foi recebida
-    // nos últimos 2 segundos.
-
     const positionIsRecent =
 
         lastPosition !== null &&
+
+        lastPositionReceivedAt !== null &&
 
         (
 
@@ -585,82 +800,22 @@ function recordSecond() {
         accuracy =
             lastPosition.coords.accuracy;
 
-        gpsAvailable = 1;
+        gpsAvailable =
+            1;
 
-
-        updateTrack(
-
-            latitude,
-
-            longitude
-
-        );
-
-    }
-
-
-    const point = {
-
-        id:
-
-            points.length + 1,
-
-
-        track_id:
-
-            trackId,
-
-
-        timestamp:
-
-            timestamp,
-
-
-        dia:
-
-            dia,
-
-
-        hora:
-
-            hora,
-
-
-        latitude:
-
-            latitude,
-
-
-        longitude:
-
-            longitude,
-
-
-        accuracy_m:
-
-            accuracy,
-
-
-        gps_available:
-
-            gpsAvailable
-
-    };
-
-
-    // CALCULAR DISTÂNCIA
-
-    if (gpsAvailable === 1) {
 
         const previousValidPoint =
             findPreviousValidPoint();
 
 
         if (
+
             previousValidPoint !== null
+
         ) {
 
-            const distance =
+            totalDistance +=
+
                 calculateDistance(
 
                     previousValidPoint.latitude,
@@ -673,27 +828,58 @@ function recordSecond() {
 
                 );
 
-
-            totalDistance +=
-                distance;
-
         }
+
+
+        updateTrack(
+            latitude,
+            longitude
+        );
 
     }
 
 
-    points.push(
-        point
-    );
+    points.push({
+
+        id:
+            points.length + 1,
+
+        track_id:
+            trackId,
+
+        timestamp:
+            now.getTime(),
+
+        dia:
+            dia,
+
+        hora:
+            hora,
+
+        latitude:
+            latitude,
+
+        longitude:
+            longitude,
+
+        accuracy_m:
+            accuracy,
+
+        gps_available:
+            gpsAvailable
+
+    });
 
 
     updateInterface();
+
+    saveState();
 
 }
 
 
 // ======================================================
-// ENCONTRAR O ÚLTIMO PONTO GPS VÁLIDO
+// ÚLTIMO PONTO VÁLIDO
 // ======================================================
 
 function findPreviousValidPoint() {
@@ -729,7 +915,7 @@ function findPreviousValidPoint() {
 
 
 // ======================================================
-// ATUALIZAR LINHA DO TRAJETO
+// LINHA DO TRAJETO
 // ======================================================
 
 function updateTrack(
@@ -738,11 +924,8 @@ function updateTrack(
 ) {
 
     const latlng = [
-
         latitude,
-
         longitude
-
     ];
 
 
@@ -751,15 +934,16 @@ function updateTrack(
     );
 
 
-    if (trackLine === null) {
+    if (
+
+        trackLine === null
+
+    ) {
 
         trackLine =
-
             L.polyline(
                 trackCoordinates
-            )
-
-            .addTo(map);
+            ).addTo(map);
 
     }
 
@@ -770,150 +954,6 @@ function updateTrack(
         );
 
     }
-
-}
-
-
-// ======================================================
-// PAUSE / RESUME
-// ======================================================
-
-function pauseRecording() {
-
-    if (!isRecording) {
-
-        return;
-
-    }
-
-
-    if (!isPaused) {
-
-        isPaused = true;
-
-        pauseStartTime =
-            Date.now();
-
-
-        statusElement.textContent =
-            "Gravação pausada";
-
-
-        pauseBtn.textContent =
-            "RESUME";
-
-
-        stopGPSWatch();
-
-        stopRecordingInterval();
-
-    }
-
-    else {
-
-        isPaused = false;
-
-
-        elapsedBeforePause +=
-
-            Date.now() -
-
-            pauseStartTime;
-
-
-        pauseStartTime = null;
-
-
-        statusElement.textContent =
-            "Gravando...";
-
-
-        pauseBtn.textContent =
-            "PAUSE";
-
-
-        startGPSWatch();
-
-        startRecordingInterval();
-
-    }
-
-}
-
-
-// ======================================================
-// STOP
-// ======================================================
-
-function stopRecording() {
-
-    if (!isRecording) {
-
-        return;
-
-    }
-
-
-    endTime =
-        Date.now();
-
-
-    isRecording =
-        false;
-
-
-    stopGPSWatch();
-
-    stopRecordingInterval();
-
-    stopTimer();
-
-
-    if (
-
-        isPaused &&
-
-        pauseStartTime !== null
-
-    ) {
-
-        elapsedBeforePause +=
-
-            endTime -
-
-            pauseStartTime;
-
-    }
-
-
-    isPaused =
-        false;
-
-
-    statusElement.textContent =
-        "Trajeto finalizado";
-
-
-    startBtn.disabled =
-        false;
-
-    pauseBtn.disabled =
-        true;
-
-    stopBtn.disabled =
-        true;
-
-
-    pauseBtn.textContent =
-        "PAUSE";
-
-
-    metadataPanel.classList.remove(
-        "hidden"
-    );
-
-
-    updateInterface();
 
 }
 
@@ -952,7 +992,11 @@ function startGPSWatch() {
 
 function stopGPSWatch() {
 
-    if (watchId !== null) {
+    if (
+
+        watchId !== null
+
+    ) {
 
         navigator.geolocation.clearWatch(
             watchId
@@ -966,7 +1010,7 @@ function stopGPSWatch() {
 
 
 // ======================================================
-// INTERVALO DE REGISTRO
+// INTERVALO
 // ======================================================
 
 function startRecordingInterval() {
@@ -987,16 +1031,169 @@ function startRecordingInterval() {
 function stopRecordingInterval() {
 
     if (
+
         recordingInterval !== null
+
     ) {
 
         clearInterval(
             recordingInterval
         );
 
-        recordingInterval = null;
+        recordingInterval =
+            null;
 
     }
+
+}
+
+
+// ======================================================
+// PAUSE
+// ======================================================
+
+function pauseRecording() {
+
+    if (!isRecording) {
+
+        return;
+
+    }
+
+
+    if (!isPaused) {
+
+        isPaused =
+            true;
+
+
+        pauseStartTime =
+            Date.now();
+
+
+        statusElement.textContent =
+            "Gravação pausada";
+
+
+        pauseBtn.textContent =
+            "RESUME";
+
+
+        stopGPSWatch();
+
+        stopRecordingInterval();
+
+    }
+
+    else {
+
+        isPaused =
+            false;
+
+
+        elapsedBeforePause +=
+
+            Date.now() -
+
+            pauseStartTime;
+
+
+        pauseStartTime =
+            null;
+
+
+        statusElement.textContent =
+            "Gravando...";
+
+
+        pauseBtn.textContent =
+            "PAUSE";
+
+
+        startGPSWatch();
+
+        startRecordingInterval();
+
+    }
+
+
+    saveState();
+
+}
+
+
+// ======================================================
+// STOP
+// ======================================================
+
+function stopRecording() {
+
+    if (!isRecording) {
+
+        return;
+
+    }
+
+
+    endTime =
+        Date.now();
+
+
+    if (
+
+        isPaused &&
+
+        pauseStartTime !== null
+
+    ) {
+
+        elapsedBeforePause +=
+
+            endTime -
+
+            pauseStartTime;
+
+    }
+
+
+    isRecording =
+        false;
+
+    isPaused =
+        false;
+
+
+    stopGPSWatch();
+
+    stopRecordingInterval();
+
+    stopTimer();
+
+
+    statusElement.textContent =
+        "Trajeto finalizado";
+
+
+    startBtn.disabled =
+        false;
+
+    pauseBtn.disabled =
+        true;
+
+    stopBtn.disabled =
+        true;
+
+
+    pauseBtn.textContent =
+        "PAUSE";
+
+
+    saveState();
+
+
+    metadataPanel.classList.remove(
+        "hidden"
+    );
 
 }
 
@@ -1025,13 +1222,18 @@ function startTimer() {
 
 function stopTimer() {
 
-    if (timerInterval !== null) {
+    if (
+
+        timerInterval !== null
+
+    ) {
 
         clearInterval(
             timerInterval
         );
 
-        timerInterval = null;
+        timerInterval =
+            null;
 
     }
 
@@ -1086,14 +1288,10 @@ function getElapsedTime() {
 
 
 // ======================================================
-// ATUALIZAR INTERFACE
+// INTERFACE
 // ======================================================
 
 function updateInterface() {
-
-    pointCountElement.textContent =
-        points.length;
-
 
     durationElement.textContent =
 
@@ -1104,7 +1302,11 @@ function updateInterface() {
         );
 
 
-    if (totalDistance < 1000) {
+    if (
+
+        totalDistance < 1000
+
+    ) {
 
         distanceElement.textContent =
 
@@ -1131,7 +1333,9 @@ function updateInterface() {
 // FORMATAR TEMPO
 // ======================================================
 
-function formatDuration(milliseconds) {
+function formatDuration(
+    milliseconds
+) {
 
     const totalSeconds =
 
@@ -1165,22 +1369,13 @@ function formatDuration(milliseconds) {
     return [
 
         String(hours)
-            .padStart(
-                2,
-                "0"
-            ),
+            .padStart(2, "0"),
 
         String(minutes)
-            .padStart(
-                2,
-                "0"
-            ),
+            .padStart(2, "0"),
 
         String(seconds)
-            .padStart(
-                2,
-                "0"
-            )
+            .padStart(2, "0")
 
     ].join(":");
 
@@ -1188,7 +1383,7 @@ function formatDuration(milliseconds) {
 
 
 // ======================================================
-// CÁLCULO DE DISTÂNCIA - HAVERSINE
+// DISTÂNCIA - HAVERSINE
 // ======================================================
 
 function calculateDistance(
@@ -1203,23 +1398,19 @@ function calculateDistance(
 
 
     const toRadians =
-
         value =>
-
             value *
             Math.PI /
             180;
 
 
     const dLat =
-
         toRadians(
             lat2 - lat1
         );
 
 
     const dLon =
-
         toRadians(
             lon2 - lon1
         );
@@ -1258,9 +1449,7 @@ function calculateDistance(
 
             Math.sqrt(a),
 
-            Math.sqrt(
-                1 - a
-            )
+            Math.sqrt(1 - a)
 
         );
 
@@ -1271,10 +1460,12 @@ function calculateDistance(
 
 
 // ======================================================
-// ERRO DE GEOLOCALIZAÇÃO
+// ERRO GPS
 // ======================================================
 
-function handlePositionError(error) {
+function handlePositionError(
+    error
+) {
 
     console.error(
         "Erro GPS:",
@@ -1292,7 +1483,7 @@ function handlePositionError(error) {
     else {
 
         statusElement.textContent =
-            "Não foi possível obter a localização.";
+            "Não foi possível obter localização.";
 
     }
 
@@ -1300,15 +1491,16 @@ function handlePositionError(error) {
 
 
 // ======================================================
-// SALVAR METADADOS
+// SALVAR DESCRIÇÃO
 // ======================================================
 
 function saveMetadata() {
 
     description =
-        descriptionInput
-            .value
-            .trim();
+        descriptionInput.value.trim();
+
+
+    saveState();
 
 
     metadataPanel.classList.add(
@@ -1329,10 +1521,14 @@ function saveMetadata() {
 
 function exportCSV() {
 
-    if (points.length === 0) {
+    if (
+
+        points.length === 0
+
+    ) {
 
         alert(
-            "Nenhum registro foi criado."
+            "Nenhum registro disponível."
         );
 
         return;
@@ -1371,9 +1567,24 @@ function exportCSV() {
 
                 headers.map(
 
-                    header =>
+                    header => {
 
-                        point[header] ?? ""
+                        const value =
+                            point[header] ?? "";
+
+
+                        return `"${
+
+                            String(value)
+
+                            .replace(
+                                /"/g,
+                                '""'
+                            )
+
+                        }"`;
+
+                    }
 
                 )
 
@@ -1421,10 +1632,14 @@ async function exportSHP() {
         );
 
 
-    if (validPoints.length === 0) {
+    if (
+
+        validPoints.length === 0
+
+    ) {
 
         alert(
-            "Nenhum ponto GPS válido foi registrado."
+            "Nenhum ponto GPS válido."
         );
 
         return;
@@ -1529,10 +1744,6 @@ async function exportSHP() {
 
         );
 
-
-        statusElement.textContent =
-            "Shapefile exportado.";
-
     }
 
     catch (error) {
@@ -1552,7 +1763,7 @@ async function exportSHP() {
 
 
 // ======================================================
-// DOWNLOAD DE ARQUIVO
+// DOWNLOAD
 // ======================================================
 
 function downloadFile(
@@ -1568,7 +1779,8 @@ function downloadFile(
             [content],
 
             {
-                type: type
+                type:
+                    type
             }
 
         );
@@ -1588,14 +1800,12 @@ function downloadBlob(
 ) {
 
     const url =
-
         URL.createObjectURL(
             blob
         );
 
 
     const link =
-
         document.createElement(
             "a"
         );
@@ -1622,9 +1832,81 @@ function downloadBlob(
     );
 
 
-    URL.revokeObjectURL(
-        url
+    setTimeout(
+
+        function () {
+
+            URL.revokeObjectURL(
+                url
+            );
+
+        },
+
+        1000
+
     );
+
+}
+
+
+// ======================================================
+// NOVO TRAJETO
+// ======================================================
+
+function newTrack() {
+
+    exportPanel.classList.add(
+        "hidden"
+    );
+
+
+    descriptionInput.value =
+        "";
+
+
+    clearState();
+
+
+    points = [];
+
+    trackCoordinates = [];
+
+    totalDistance = 0;
+
+    trackId = null;
+
+    startTime = null;
+
+    endTime = null;
+
+    description = "";
+
+
+    if (
+
+        trackLine !== null
+
+    ) {
+
+        map.removeLayer(
+            trackLine
+        );
+
+        trackLine = null;
+
+    }
+
+
+    durationElement.textContent =
+        "00:00:00";
+
+
+    distanceElement.textContent =
+        "0 m";
+
+
+    statusElement.textContent =
+        "Pronto para iniciar";
 
 }
 
@@ -1669,10 +1951,18 @@ shpBtn.addEventListener(
 );
 
 
+newTrackBtn.addEventListener(
+    "click",
+    newTrack
+);
+
+
 // ======================================================
 // INICIALIZAÇÃO
 // ======================================================
 
 loadPredefinedLayers();
+
+restoreState();
 
 locateUser();

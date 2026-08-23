@@ -12,38 +12,31 @@
 
     <title>GPS Web Logger</title>
 
-
-    <!-- CSS DO APLICATIVO -->
-
-    <link
-        rel="stylesheet"
-        href="style.css"
-    >
-
-
-    <!-- LEAFLET -->
-
+    <!-- Leaflet -->
     <link
         rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     >
 
     <script
-        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
-    </script>
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    ></script>
 
-
-    <!-- GERAÇÃO DE SHAPEFILE -->
-
+    <!-- shp-write -->
     <script
-        src="https://unpkg.com/@mapbox/shp-write@latest/shpwrite.js">
-    </script>
+        src="https://unpkg.com/@mapbox/shp-write@latest/shpwrite.js"
+    ></script>
+
+    <!-- CSS -->
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
 
 </head>
 
 
 <body>
-
 
     <!-- MAPA -->
 
@@ -60,7 +53,6 @@
 
 
         <div class="infoRow">
-
 
             <div>
 
@@ -100,21 +92,19 @@
 
             </div>
 
-
         </div>
 
     </div>
 
 
-    <!-- CONTROLES INFERIORES -->
+    <!-- CONTROLES -->
 
     <div id="controls">
 
-
-        <button id="startBtn">
-
+        <button
+            id="startBtn"
+        >
             START
-
         </button>
 
 
@@ -122,9 +112,7 @@
             id="pauseBtn"
             disabled
         >
-
             PAUSE
-
         </button>
 
 
@@ -132,16 +120,13 @@
             id="stopBtn"
             disabled
         >
-
             STOP
-
         </button>
-
 
     </div>
 
 
-    <!-- MODAL DE METADADOS -->
+    <!-- MODAL DE DESCRIÇÃO -->
 
     <div
         id="metadataPanel"
@@ -150,14 +135,13 @@
 
         <div class="modalContent">
 
-
             <h2>
                 Trajeto finalizado
             </h2>
 
 
             <p>
-                Adicione uma descrição opcional.
+                Adicione uma descrição opcional para o trajeto.
             </p>
 
 
@@ -167,12 +151,11 @@
             ></textarea>
 
 
-            <button id="saveMetadataBtn">
-
+            <button
+                id="saveMetadataBtn"
+            >
                 CONTINUAR
-
             </button>
-
 
         </div>
 
@@ -188,35 +171,37 @@
 
         <div class="modalContent">
 
-
             <h2>
-                Exportar dados
+                Exportar trajeto
             </h2>
 
 
-            <button id="csvBtn">
-
+            <button
+                id="csvBtn"
+            >
                 DOWNLOAD CSV
-
             </button>
 
 
-            <button id="shpBtn">
-
+            <button
+                id="shpBtn"
+            >
                 DOWNLOAD SHP
-
             </button>
 
+
+            <button
+                id="newTrackBtn"
+            >
+                NOVO TRAJETO
+            </button>
 
         </div>
 
     </div>
 
 
-    <!-- SCRIPT PRINCIPAL -->
-
     <script src="app.js"></script>
-
 
 </body>
 

@@ -34,17 +34,11 @@ body {
 
     position: fixed;
 
-    top: 0;
-
-    left: 0;
+    inset: 0;
 
     width: 100%;
 
-    width: 100vw;
-
     height: 100%;
-
-    height: 100vh;
 
     z-index: 1;
 
@@ -73,7 +67,7 @@ body {
     padding: 14px 16px;
 
     background:
-        rgba(255, 255, 255, 0.94);
+        rgba(255, 255, 255, 0.95);
 
     border-radius: 14px;
 
@@ -84,11 +78,11 @@ body {
 }
 
 
-/* STATUS */
-
 #status {
 
     margin-bottom: 12px;
+
+    text-align: center;
 
     font-size: 0.9rem;
 
@@ -97,7 +91,9 @@ body {
 }
 
 
-/* LINHA DE INFORMAÇÕES */
+/* =====================================================
+   INFORMAÇÕES
+===================================================== */
 
 .infoRow {
 
@@ -144,27 +140,8 @@ body {
 }
 
 
-/* PRECISÃO GPS */
-
-.gpsInfo {
-
-    margin-top: 10px;
-
-    padding-top: 8px;
-
-    border-top:
-        1px solid
-        rgba(0, 0, 0, 0.08);
-
-    text-align: center;
-
-    font-size: 0.8rem;
-
-}
-
-
 /* =====================================================
-   CONTROLES INFERIORES
+   BOTÕES
 ===================================================== */
 
 #controls {
@@ -191,8 +168,6 @@ body {
 
 }
 
-
-/* BOTÕES */
 
 button {
 
@@ -303,8 +278,7 @@ textarea {
 
     padding: 12px;
 
-    border:
-        1px solid #ccc;
+    border: 1px solid #ccc;
 
     border-radius: 8px;
 
@@ -317,13 +291,61 @@ textarea {
 }
 
 
-/* =====================================================
-   OCULTAR
-===================================================== */
-
 .hidden {
 
     display: none;
+
+}
+
+
+/* =====================================================
+   POPUP DAS CAMADAS
+===================================================== */
+
+.featurePopup {
+
+    min-width: 180px;
+
+    max-width: 280px;
+
+}
+
+
+.popupRow {
+
+    margin-bottom: 8px;
+
+    padding-bottom: 8px;
+
+    border-bottom:
+        1px solid
+        rgba(0, 0, 0, 0.08);
+
+}
+
+
+.popupRow:last-child {
+
+    margin-bottom: 0;
+
+    padding-bottom: 0;
+
+    border-bottom: none;
+
+}
+
+
+.popupRow strong {
+
+    display: block;
+
+    margin-bottom: 2px;
+
+    font-size: 0.75rem;
+
+    text-transform: capitalize;
+
+    color: #666;
 
 }
 
@@ -394,56 +416,5 @@ textarea {
             translateX(-50%);
 
     }
-
-}
-
-/* =====================================================
-   POPUP DAS CAMADAS
-===================================================== */
-
-.featurePopup {
-
-    min-width: 180px;
-
-    max-width: 280px;
-
-}
-
-
-.popupRow {
-
-    margin-bottom: 8px;
-
-    padding-bottom: 8px;
-
-    border-bottom:
-        1px solid
-        rgba(0, 0, 0, 0.08);
-
-}
-
-
-.popupRow:last-child {
-
-    margin-bottom: 0;
-
-    padding-bottom: 0;
-
-    border-bottom: none;
-
-}
-
-
-.popupRow strong {
-
-    display: block;
-
-    margin-bottom: 2px;
-
-    font-size: 0.75rem;
-
-    text-transform: capitalize;
-
-    color: #666;
 
 }
