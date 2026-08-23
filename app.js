@@ -1606,7 +1606,7 @@ function exportCSV() {
 
         csv,
 
-        `${trackId}.csv`,
+        createFilename("csv"),
 
         "text/csv;charset=utf-8"
 
@@ -1740,7 +1740,7 @@ async function exportSHP() {
 
             zipBlob,
 
-            `${trackId}.zip`
+            createFilename("zip")
 
         );
 
@@ -1761,6 +1761,35 @@ async function exportSHP() {
 
 }
 
+// ======================================================
+// CRIAR NOME DO ARQUIVO
+// ======================================================
+
+function createFilename(extension) {
+
+    const date = new Date(startTime)
+        .toISOString()
+        .replace(/[:.]/g, "-")
+        .replace("T", "_")
+        .replace("Z", "");
+
+
+    const safeDescription = description
+
+        ? description
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "")
+            .substring(0, 50)
+
+        : "trajeto";
+
+
+    return `gps_${date}_${safeDescription}.${extension}`;
+
+}
 
 // ======================================================
 // DOWNLOAD
