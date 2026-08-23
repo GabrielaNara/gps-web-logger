@@ -396,3 +396,54 @@ textarea {
     }
 
 }
+
+/* =====================================================
+   POPUP DAS CAMADAS
+===================================================== */
+
+.featurePopup {
+
+    min-width: 180px;
+
+    max-width: 280px;
+
+}
+
+
+.popupRow {
+
+    margin-bottom: 8px;
+
+    padding-bottom: 8px;
+
+    border-bottom:
+        1px solid
+        rgba(0, 0, 0, 0.08);
+
+}
+
+
+.popupRow:last-child {
+
+    margin-bottom: 0;
+
+    padding-bottom: 0;
+
+    border-bottom: none;
+
+}
+
+
+.popupRow strong {
+
+    display: block;
+
+    margin-bottom: 2px;
+
+    font-size: 0.75rem;
+
+    text-transform: capitalize;
+
+    color: #666;
+
+}

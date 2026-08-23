@@ -110,9 +110,6 @@ const durationElement =
 const distanceElement =
     document.getElementById("distance");
 
-const pointCountElement =
-    document.getElementById("pointCount");
-
 const accuracyElement =
     document.getElementById("accuracy");
 
@@ -181,40 +178,76 @@ async function loadPredefinedLayers() {
                 await response.json();
 
 
-            const layer =
-                L.geoJSON(
-
+            const layer = L.geoJSON(
                     geojson,
-
                     {
 
-                        pointToLayer:
+                        style: {
+                            weight: 2,
+                            fillOpacity: 0.15
+                        },
 
-                            function (
-                                feature,
-                                latlng
+
+                        pointToLayer: function (
+                            feature,
+                            latlng
+                        ) {
+
+                            return L.circleMarker(
+                                latlng,
+                                {
+                                    radius: 7,
+                                    weight: 2,
+                                    fillOpacity: 0.8
+                                }
+                            );
+
+                        },
+
+
+                        onEachFeature: function (
+                            feature,
+                            leafletLayer
+                        ) {
+
+                            if (
+                                feature.properties
                             ) {
 
-                                return L.circleMarker(
+                                let popupContent =
+                                    "<div class='featurePopup'>";
 
-                                    latlng,
 
-                                    {
+                                for (
+                                    const [key, value]
+                                    of Object.entries(
+                                        feature.properties
+                                    )
+                                ) {
 
-                                        radius: 7,
+                                    popupContent += `
+                                        <div class="popupRow">
+                                            <strong>${key}:</strong>
+                                            ${value}
+                                        </div>
+                                    `;
 
-                                        weight: 2,
+                                }
 
-                                        fillOpacity: 0.8
 
-                                    }
+                                popupContent +=
+                                    "</div>";
 
+
+                                leafletLayer.bindPopup(
+                                    popupContent
                                 );
 
                             }
 
-                    }
+                        }
 
+                    }
                 ).addTo(map);
 
 
