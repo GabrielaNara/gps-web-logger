@@ -12,7 +12,13 @@
 
     <title>GPS Web Logger</title>
 
-    <link rel="stylesheet" href="style.css">
+
+    <!-- CSS DO APP -->
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
 
 
     <!-- LEAFLET -->
@@ -27,13 +33,6 @@
     </script>
 
 
-    <!-- LEITURA DE SHAPEFILE -->
-
-    <script
-        src="https://unpkg.com/shpjs@latest/dist/shp.js">
-    </script>
-
-
     <!-- GERAÇÃO DE SHAPEFILE -->
 
     <script
@@ -45,40 +44,26 @@
 
 <body>
 
-    <main class="container">
+    <!-- MAPA -->
 
-        <header>
-
-            <h1>GPS Web Logger</h1>
-
-            <p id="status">
-                Obtendo localização...
-            </p>
-
-        </header>
+    <div id="map"></div>
 
 
-        <!-- INFORMAÇÕES -->
+    <!-- PAINEL SUPERIOR -->
 
-        <section class="info-grid">
+    <div id="infoPanel">
 
-            <div class="card">
-
-                <span class="label">
-                    Pontos registrados
-                </span>
-
-                <strong id="pointCount">
-                    0
-                </strong>
-
-            </div>
+        <div id="status">
+            Obtendo localização...
+        </div>
 
 
-            <div class="card">
+        <div class="infoRow">
+
+            <div>
 
                 <span class="label">
-                    Duração
+                    Tempo
                 </span>
 
                 <strong id="duration">
@@ -88,7 +73,7 @@
             </div>
 
 
-            <div class="card">
+            <div>
 
                 <span class="label">
                     Distância
@@ -101,165 +86,112 @@
             </div>
 
 
-            <div class="card">
+            <div>
 
                 <span class="label">
-                    Precisão atual
+                    Registros
                 </span>
 
-                <strong id="accuracy">
-                    --
+                <strong id="pointCount">
+                    0
                 </strong>
 
             </div>
 
-        </section>
+        </div>
 
 
-        <!-- POSIÇÃO -->
+        <div class="gpsInfo">
 
-        <section class="coordinates">
+            <span>
+                Precisão:
+                <strong id="accuracy">--</strong>
+            </span>
 
-            <h2>Posição atual</h2>
+        </div>
 
-            <p>
-
-                Latitude:
-
-                <span id="latitude">
-                    --
-                </span>
-
-            </p>
+    </div>
 
 
-            <p>
+    <!-- CONTROLES INFERIORES -->
 
-                Longitude:
+    <div id="controls">
 
-                <span id="longitude">
-                    --
-                </span>
+        <button id="startBtn">
 
-            </p>
+            START
 
-        </section>
+        </button>
 
 
-        <!-- MAPA -->
-
-        <section class="map-section">
-
-            <h2>
-                Localização e trajeto
-            </h2>
-
-
-            <div id="map"></div>
-
-
-            <!-- CAMADA EXTERNA -->
-
-            <div class="layer-controls">
-
-                <label for="shpInput">
-
-                    Adicionar camada SHP
-
-                </label>
-
-
-                <input
-                    type="file"
-                    id="shpInput"
-                    accept=".zip"
-                >
-
-
-                <button
-                    id="removeLayerBtn"
-                    type="button"
-                >
-
-                    REMOVER CAMADA
-
-                </button>
-
-            </div>
-
-        </section>
-
-
-        <!-- CONTROLES -->
-
-        <section class="controls">
-
-            <button id="startBtn">
-
-                START
-
-            </button>
-
-
-            <button
-                id="pauseBtn"
-                disabled
-            >
-
-                PAUSE
-
-            </button>
-
-
-            <button
-                id="stopBtn"
-                disabled
-            >
-
-                STOP
-
-            </button>
-
-        </section>
-
-
-        <!-- METADADOS -->
-
-        <section
-            id="metadataSection"
-            class="metadata hidden"
+        <button
+            id="pauseBtn"
+            disabled
         >
+
+            PAUSE
+
+        </button>
+
+
+        <button
+            id="stopBtn"
+            disabled
+        >
+
+            STOP
+
+        </button>
+
+    </div>
+
+
+    <!-- METADADOS -->
+
+    <div
+        id="metadataPanel"
+        class="modal hidden"
+    >
+
+        <div class="modalContent">
 
             <h2>
                 Trajeto finalizado
             </h2>
 
+
             <p>
-                Adicione uma descrição opcional do trajeto.
+
+                Adicione uma descrição opcional.
+
             </p>
 
 
             <textarea
                 id="description"
-                placeholder="Ex.: percurso realizado a pé pelo centro histórico..."
+                placeholder="Descrição do trajeto..."
             ></textarea>
 
 
             <button id="saveMetadataBtn">
 
-                CONFIRMAR DESCRIÇÃO
+                CONTINUAR
 
             </button>
 
-        </section>
+        </div>
+
+    </div>
 
 
-        <!-- EXPORTAÇÃO -->
+    <!-- EXPORTAÇÃO -->
 
-        <section
-            id="exportSection"
-            class="export hidden"
-        >
+    <div
+        id="exportPanel"
+        class="modal hidden"
+    >
+
+        <div class="modalContent">
 
             <h2>
                 Exportar dados
@@ -279,9 +211,9 @@
 
             </button>
 
-        </section>
+        </div>
 
-    </main>
+    </div>
 
 
     <script src="app.js"></script>
