@@ -1773,19 +1773,21 @@ function createFilename(extension) {
         .replace("T", "_")
         .replace("Z", "");
 
+    // Pega diretamente o valor atual da descrição
+    const currentDescription =
+        descriptionInput.value.trim() || description;
 
-    const safeDescription = description
+    const safeDescription = currentDescription
 
-        ? description
+        ? currentDescription
             .toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "")
             .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, "")
+            .replace(/^-+|-+$/g, "")
             .substring(0, 50)
 
         : "trajeto";
-
 
     return `gps_${date}_${safeDescription}.${extension}`;
 
