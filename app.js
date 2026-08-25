@@ -3,7 +3,7 @@ let map;
 let watchId = null;
 let isPaused = false;
 let routeCoords = [];
-let routeData = []; // {lat, lon, timestamp, accuracy}
+let routeData = []; 
 let currentPolyline;
 let marker;
 let startTime;
@@ -11,15 +11,87 @@ let totalDistance = 0;
 let timerInterval;
 let wakeLock = null;
 
-// Inicializar Mapa
+// Função para limpar o nome do arquivo (remove acentos e espaços)
+function sanitizeFilename(name) {
+    if (!name) return "sem_descricao";
+    return name
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos
+        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove caracteres especiais
+        .trim()
+        .replace(/\s+/g, '_'); // Troca espaços por underline
+}
+
+// Inicializar Mapa e centralizar no usuário
 function initMap() {
-    map = L.map('map').setView([-15.7801, -47.9292], 13); // Inicia em Brasília
+    map = L.map('map').setView([-15.7801, -47.9292], 4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Aqui você pode carregar um arquivo GeoJSON local da sua equipe
-    // fetch('dados/camadas_preexistentes.geojson').then(...)
+    // 1. Centralizar no usuário assim que o app abre
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude, longitude } = position.coords;
+            map.setView([latitude, longitude], 16);
+        },
+        (error) => { console.log("Não foi possível obter a localização inicial."); },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+
+    // 2. Carregar as camadas da pasta layers
+    loadExternalLayers();
+}
+
+// Carregar arquivos GeoJSON da pasta "layers"
+function loadExternalLayers() {
+    // LISTA DE ARQUIVOS DA SUA PASTA LAYERS
+    // Altere os nomes abaixo para os nomes reais dos seus arquivos .geojson
+    const layers = [
+        { file: 'layers/pontos.geojson', color: 'blue' },
+        { file: 'layers/teste_edificacao.geojson', color: 'green' },
+        // Adicione mais aqui seguindo o modelo
+    ];
+
+    layers.forEach(layerInfo => {
+        fetch(layerInfo.file)
+            .then(response => {
+                if (!response.ok) throw new Error(`Erro ao carregar ${layerInfo.file}`);
+                return response.json();
+            })
+            .then(data => {
+                L.geoJSON(data, {
+                    style: {
+                        color: layerInfo.color,
+                        weight: 3,
+                        fillOpacity: 0.3
+                    },
+                    pointToLayer: function (feature, latlng) {
+                        // Cria um círculo para pontos
+                        return L.circleMarker(latlng, {
+                            radius: 6,
+                            fillColor: layerInfo.color,
+                            color: "#000",
+                            weight: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: function (feature, layer) {
+                        // LÓGICA PARA CLICAR E VER ATRIBUTOS
+                        if (feature.properties) {
+                            let popupContent = '<div class="popup-attrs">';
+                            for (let key in feature.properties) {
+                                popupContent += `<b>${key}:</b> ${feature.properties[key]}<br>`;
+                            }
+                            popupContent += '</div>';
+                            layer.bindPopup(popupContent);
+                        }
+                    }
+                }).addTo(map);
+            })
+            .catch(error => {
+                console.warn(error.message); // Avisa no console se o arquivo não existir
+            });
+    });
 }
 
 // Manter a tela acesa no mobile
@@ -29,13 +101,13 @@ async function requestWakeLock() {
             wakeLock = await navigator.wakeLock.request('screen');
         }
     } catch (err) {
-        console.log('Wake Lock não suportado ou negado');
+        console.log('Wake Lock não suportado');
     }
 }
 
 // Cálculo de Distância (Fórmula de Haversine)
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; // Raio da Terra em metros
+    const R = 6371e3; 
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -45,7 +117,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// Botão START
+// START
 document.getElementById('btn-start').addEventListener('click', () => {
     if (watchId) return;
     
@@ -74,11 +146,9 @@ document.getElementById('btn-start').addEventListener('click', () => {
             routeCoords.push({ lat: latitude, lng: longitude });
             routeData.push({ lat: latitude, lon: longitude, timestamp: Date.now(), accuracy: accuracy });
 
-            // Atualiza UI
             document.getElementById('distance').innerText = totalDistance.toFixed(0);
             document.getElementById('accuracy').innerText = accuracy.toFixed(0);
             
-            // Atualiza Mapa
             if (currentPolyline) map.removeLayer(currentPolyline);
             currentPolyline = L.polyline(routeCoords, {color: 'red', weight: 4}).addTo(map);
             
@@ -90,7 +160,6 @@ document.getElementById('btn-start').addEventListener('click', () => {
         { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
     );
 
-    // Timer
     timerInterval = setInterval(() => {
         if (watchId && !isPaused) {
             const elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -103,80 +172,84 @@ document.getElementById('btn-start').addEventListener('click', () => {
     document.getElementById('btn-stop').disabled = false;
 });
 
-// Botão PAUSE / RESUME
+// PAUSE / RESUME
 document.getElementById('btn-pause').addEventListener('click', (e) => {
     isPaused = !isPaused;
     e.target.innerText = isPaused ? "RESUME" : "PAUSE";
 });
 
-// Botão STOP
+// STOP
 document.getElementById('btn-stop').addEventListener('click', () => {
     if (navigator.geolocation && watchId) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
         clearInterval(timerInterval);
         
-        // Libera a tela para apagar novamente
         if (wakeLock) {
             wakeLock.release();
             wakeLock = null;
         }
-        
         document.getElementById('stop-modal').classList.remove('hidden');
     }
 });
 
-// Botão CONTINUAR (Após descrever)
+// CONTINUAR
 document.getElementById('btn-continue').addEventListener('click', () => {
     document.getElementById('stop-modal').classList.add('hidden');
     document.getElementById('result-modal').classList.remove('hidden');
 });
 
-// Botão Download CSV
+// Download CSV
 document.getElementById('btn-csv').addEventListener('click', () => {
     let csv = "lat,lon,timestamp,accuracy\n";
     routeData.forEach(row => {
         csv += `${row.lat},${row.lon},${row.timestamp},${row.accuracy}\n`;
     });
+    
+    const desc = sanitizeFilename(document.getElementById('route-description').value);
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'trajeto.csv';
+    a.download = `trajeto_${desc}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 });
 
-// Botão Download SHP
+// Download SHP
 document.getElementById('btn-shp').addEventListener('click', () => {
-    const desc = document.getElementById('route-description').value || "Sem descrição";
+    const rawDesc = document.getElementById('route-description').value || "Sem descricao";
+    const desc = sanitizeFilename(rawDesc);
     
     const geojson = {
         type: "FeatureCollection",
         features: [{
             type: "Feature",
             geometry: { type: "LineString", coordinates: routeData.map(p => [p.lon, p.lat]) },
-            properties: { descricao: desc }
+            properties: { descricao: rawDesc }
         }]
     };
     
-    // shpwrite gera um zip contendo .shp, .shx, .dbf, .prj
-    shpwrite.zip(geojson).then(content => {
-        const blob = new Blob([content], { type: 'application/zip' });
-        const url = window.URL.createObjectURL(blob);
+    Promise.resolve(shpwrite.zip(geojson)).then(content => {
+        let url;
+        if (typeof content === 'string') {
+            url = 'data:application/zip;base64,' + content;
+        } else {
+            url = window.URL.createObjectURL(content);
+        }
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'trajeto_shp.zip';
+        a.download = `trajeto_${desc}.zip`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+        if (typeof content !== 'string') window.URL.revokeObjectURL(url);
     });
 });
 
-// Botão NOVO TRAJETO
+// NOVO TRAJETO
 document.getElementById('btn-new').addEventListener('click', () => {
     document.getElementById('result-modal').classList.add('hidden');
     document.getElementById('btn-start').disabled = false;

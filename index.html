@@ -2,20 +2,21 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <!-- Metatags para Mobile / PWA -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#ffffff">
     
     <title>Rastreador Mobile</title>
-    <!-- Leaflet CSS -->
+    
+    <!-- Leaflet CSS e JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css">
-    <!-- Bibliotecas externas (Apenas Leaflet e Gerador de SHP) -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Biblioteca para gerar Shapefile (SHP) -->
     <script src="https://unpkg.com/@mapbox/shp-write@0.4.3/shpwrite.min.js"></script>
+
+    <!-- Seu arquivo CSS -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <!-- Barra Superior -->
@@ -44,7 +45,7 @@
         </div>
     </div>
 
-    <!-- Modal de Resultado (Sem o botão de compartilhar) -->
+    <!-- Modal de Resultado -->
     <div id="result-modal" class="modal hidden">
         <div class="modal-content">
             <h2>Trajeto Concluído!</h2>
@@ -56,6 +57,7 @@
         </div>
     </div>
 
+    <!-- Seu arquivo JavaScript -->
     <script src="app.js"></script>
 </body>
 </html>
