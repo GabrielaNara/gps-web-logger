@@ -6,13 +6,13 @@ let routeCoords = [];
 let routeData = []; 
 let currentPolyline;
 let marker;
-let initialLocationMarker; // Marcador azul inicial
+let initialLocationMarker;
 let startTime;
 let totalDistance = 0;
 let timerInterval;
 let wakeLock = null;
 let currentHeading = 0;
-let routeId = ""; // ID único do roteiro
+let routeId = "";
 
 // Ícone da Seta (SVG) - Bússola
 const arrowIcon = L.divIcon({
@@ -34,7 +34,7 @@ function sanitizeFilename(name) {
         .replace(/\s+/g, '_');
 }
 
-// Gerar ID único do Roteiro baseado no horário
+// Gerar ID único do Roteiro
 function generateRouteId() {
     const date = new Date();
     const format = (n) => n.toString().padStart(2, '0');
@@ -51,7 +51,6 @@ function initMap() {
     // (3) Centralizar e mostrar localização assim que o app abre
     map.locate({setView: true, maxZoom: 16});
     map.on('locationfound', (e) => {
-        // Adiciona um círculo azul mostrando a posição inicial
         if (initialLocationMarker) map.removeLayer(initialLocationMarker);
         initialLocationMarker = L.circle(e.latlng, {
             radius: e.accuracy / 2,
@@ -114,7 +113,7 @@ async function requestWakeLock() {
     } catch (err) { console.log('Wake Lock não suportado'); }
 }
 
-// PEDIDO DE PERMISSÃO DA BÚSSOLA
+// PERMISSÃO DA BÚSSOLA
 function requestCompassPermission() {
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
@@ -130,7 +129,6 @@ function requestCompassPermission() {
     }
 }
 
-// Capturar giro do celular
 function handleDeviceOrientation(event) {
     let heading = null;
     if (event.webkitCompassHeading) {
@@ -178,11 +176,11 @@ document.getElementById('btn-start').addEventListener('click', () => {
     totalDistance = 0;
     startTime = Date.now();
     isPaused = false;
-    routeId = generateRouteId(); // Gera o ID do roteiro
+    routeId = generateRouteId(); // Gera o ID
 
     if (currentPolyline) map.removeLayer(currentPolyline);
-    if (marker) map.removeLayer(marker);
-    if (initialLocationMarker) map.removeLayer(initialLocationMarker); // Remove o círculo azul inicial
+    if (marker) { map.removeLayer(marker); marker = null; } // Limpa qualquer marcador antigo
+    if (initialLocationMarker) map.removeLayer(initialLocationMarker);
 
     requestWakeLock();
     requestCompassPermission();
@@ -199,7 +197,15 @@ document.getElementById('btn-start').addEventListener('click', () => {
             }
 
             routeCoords.push({ lat: latitude, lng: longitude });
-            routeData.push({ lat: latitude, lon: longitude, timestamp: Date.now(), accuracy: accuracy });
+            
+            // (1) Adiciona o ID em cada linha dos dados coletados
+            routeData.push({ 
+                id: routeId, 
+                lat: latitude, 
+                lon: longitude, 
+                timestamp: Date.now(), 
+                accuracy: accuracy 
+            });
 
             document.getElementById('distance').innerText = totalDistance.toFixed(0);
             document.getElementById('accuracy').innerText = accuracy.toFixed(0);
@@ -207,10 +213,11 @@ document.getElementById('btn-start').addEventListener('click', () => {
             if (currentPolyline) map.removeLayer(currentPolyline);
             currentPolyline = L.polyline(routeCoords, {color: 'red', weight: 4}).addTo(map);
             
-            if (marker) {
-                marker.setLatLng([latitude, longitude]);
-            } else {
+            // (3) Garante que o marcador será criado na primeira vez e apenas movido depois
+            if (!marker) {
                 marker = L.marker([latitude, longitude], { icon: arrowIcon }).addTo(map);
+            } else {
+                marker.setLatLng([latitude, longitude]);
             }
             updateMarkerRotation();
             
@@ -261,13 +268,12 @@ document.getElementById('btn-continue').addEventListener('click', () => {
 
 // Download CSV
 document.getElementById('btn-csv').addEventListener('click', () => {
-    // Adicionado a coluna 'id' no cabeçalho e nos dados
     let csv = "id,dia,hora,timestamp,lat,lon,accuracy\n";
     routeData.forEach(row => {
         const date = new Date(row.timestamp);
         const dia = date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
         const hora = date.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        csv += `${routeId},${dia},${hora},${row.timestamp},${row.lat},${row.lon},${row.accuracy}\n`;
+        csv += `${row.id},${dia},${hora},${row.timestamp},${row.lat},${row.lon},${row.accuracy}\n`;
     });
     
     const desc = sanitizeFilename(document.getElementById('route-description').value);
@@ -282,8 +288,14 @@ document.getElementById('btn-csv').addEventListener('click', () => {
     window.URL.revokeObjectURL(url);
 });
 
-// Download SHP
+// Download SHP (Corrigido)
 document.getElementById('btn-shp').addEventListener('click', () => {
+    // (2) O SHP precisa de pelo menos 2 pontos para formar uma linha
+    if (routeData.length < 2) {
+        alert("Caminhe um pouco para registrar pelo menos 2 pontos antes de baixar o SHP.");
+        return;
+    }
+
     const rawDesc = document.getElementById('route-description').value || "Sem_descricao";
     const desc = sanitizeFilename(rawDesc);
     
@@ -292,61 +304,45 @@ document.getElementById('btn-shp').addEventListener('click', () => {
         features: [{
             type: "Feature",
             geometry: { type: "LineString", coordinates: routeData.map(p => [p.lon, p.lat]) },
-            // Adicionado o ID também nas propriedades do SHP
             properties: { id: routeId, descricao: rawDesc }
         }]
     };
     
     try {
-        const downloadContent = (content) => {
-            let blob;
-            if (typeof content === 'string') {
-                const byteCharacters = atob(content);
-                const byteArrays = [];
-                for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-                    const slice = byteCharacters.slice(offset, offset + 512);
-                    const byteNumbers = new Array(slice.length);
-                    for (let i = 0; i < slice.length; i++) {
-                        byteNumbers[i] = slice.charCodeAt(i);
-                    }
-                    const byteArray = new Uint8Array(byteNumbers);
-                    byteArrays.push(byteArray);
-                }
-                blob = new Blob(byteArrays, { type: 'application/zip' });
-            } else {
-                blob = content;
-            }
-
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `trajeto_${desc}_${routeId}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }, 100);
-        };
-
-        // Verifica se a variável global foi carregada
         if (typeof shpwrite === 'undefined') {
-            alert("Erro: Biblioteca SHP não carregou. Verifique o link no index.html.");
+            alert("Erro: Biblioteca SHP não carregou. Verifique sua internet.");
             return;
         }
 
-        if (shpwrite.zip.length >= 2) {
-            shpwrite.zip(geojson, function(err, content) {
-                if (err) throw err;
-                downloadContent(content);
-            });
-        } else {
-            const content = shpwrite.zip(geojson);
-            downloadContent(content);
+        // shpwrite.zip(geojson) retorna uma string Base64
+        const base64Data = shpwrite.zip(geojson);
+        
+        // Converte Base64 para Blob
+        let byteString = base64Data;
+        if (byteString.startsWith('data:application/zip;base64,')) {
+            byteString = byteString.split(',')[1];
         }
+        
+        const byteNumbers = new Array(byteString.length);
+        for (let i = 0; i < byteString.length; i++) {
+            byteNumbers[i] = byteString.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/zip' });
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `trajeto_${desc}_${routeId}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 100);
     } catch (err) {
+        console.error("Erro SHP:", err);
         alert("Erro ao gerar SHP: " + err.message);
-        console.error(err);
     }
 });
 
@@ -362,9 +358,9 @@ document.getElementById('btn-new').addEventListener('click', () => {
     document.getElementById('accuracy').innerText = '-';
     document.getElementById('route-description').value = '';
     if (currentPolyline) map.removeLayer(currentPolyline);
-    if (marker) map.removeLayer(marker);
+    if (marker) { map.removeLayer(marker); marker = null; }
     
-    // Busca a localização inicial novamente para o mapa não ficar vazio
+    // Busca a localização inicial novamente
     map.locate({setView: true, maxZoom: 16});
 });
 
