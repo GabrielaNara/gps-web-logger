@@ -7,27 +7,25 @@ html, body {
     margin: 0;
     padding: 0;
     width: 100%;
-    height: 100dvh; /* Trava a altura dinâmica do celular */
+    height: 100%;
     overflow: hidden;
-    position: fixed; /* Trava o body */
+    position: fixed;
     top: 0;
     left: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* MAPA: Fixado entre o top(60px) e o bottom(100px) */
+/* MAPA: Posicionado no topo, o JS calcula a altura exata */
 #map {
     position: fixed;
     top: 60px;
-    bottom: 100px;
     left: 0;
-    right: 0;
     width: 100%;
     z-index: 1;
     background: #ddd;
 }
 
-/* BARRA SUPERIOR: Fixada no topo */
+/* BARRA SUPERIOR */
 #top-bar {
     position: fixed;
     top: 0;
@@ -45,7 +43,7 @@ html, body {
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
-/* BARRA INFERIOR: Fixada no rodapé */
+/* BARRA INFERIOR */
 #bottom-bar {
     position: fixed;
     bottom: 0;

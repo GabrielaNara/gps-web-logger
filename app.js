@@ -87,8 +87,8 @@ function initMap() {
 
 function loadExternalLayers() {
     const layers = [
-        { file: 'layers/pontos.geojson', color: 'blue' },
-        { file: 'layers/teste_edificacao.geojson', color: 'green' }
+        { file: 'layers/camada_escolas.geojson', color: 'blue' },
+        { file: 'layers/camada_ruas.geojson', color: 'green' }
     ];
 
     layers.forEach(layerInfo => {
@@ -210,7 +210,6 @@ document.getElementById('btn-start').addEventListener('click', () => {
 
             routeCoords.push({ lat: latitude, lng: longitude });
             
-            // Adiciona o ID em cada um dos registros da memória
             routeData.push({ 
                 id: routeId, 
                 lat: latitude, 
@@ -330,7 +329,7 @@ document.getElementById('btn-shp').addEventListener('click', async () => {
             return;
         }
 
-        // SOLUÇÃO DEFINITIVA: Usar outputType: "blob"
+        // SOLUÇÃO DEFINITIVA DO SHP: Usar outputType: "blob"
         const zipBlob = await shpwrite.zip(geojson, {
             folder: "trajeto",
             filename: `trajeto_${desc}_${routeId}`,
@@ -373,35 +372,48 @@ document.getElementById('btn-new').addEventListener('click', () => {
 });
 
 // ======================================================
-// INICIAR APLICAÇÃO
+// FORÇAR TAMANHO DO MAPA (SOLUÇÃO DEFINITIVA)
 // ======================================================
-initMap();
-
-// CORREÇÃO DO MAPA CORTADO: Força o Leaflet a recalcular o tamanho da tela 
-// depois que o navegador do celular termina de carregar 100%
-// ======================================================
-// INICIAR APLICAÇÃO
-// ======================================================
-
-// Inicializa o mapa
-initMap();
-
-// CORREÇÃO DO MAPA CORTADO: 
-// Espera a página carregar 100% e dá um atraso de 300ms 
-// para o navegador do celular terminar de esconder a barra de URL.
-window.addEventListener('load', function() {
-    setTimeout(function() {
+function resizeMap() {
+    const topBar = document.getElementById('top-bar');
+    const bottomBar = document.getElementById('bottom-bar');
+    const mapDiv = document.getElementById('map');
+    
+    if (topBar && bottomBar && mapDiv) {
+        // Pega a altura real das barras em pixels
+        const topHeight = topBar.offsetHeight;
+        const bottomHeight = bottomBar.offsetHeight;
+        
+        // Calcula a altura exata que o mapa deve ter
+        const mapHeight = window.innerHeight - topHeight - bottomHeight;
+        
+        // Aplica a altura exata em pixels no mapa
+        mapDiv.style.height = `${mapHeight}px`;
+        mapDiv.style.top = `${topHeight}px`;
+        
+        // Avisa o Leaflet que o tamanho mudou para ele se redesenhar
         if (map) {
             map.invalidateSize();
         }
-    }, 300);
+    }
+}
+
+// ======================================================
+// INICIAR APLICAÇÃO
+// ======================================================
+initMap();
+
+// Espera a página carregar 100% e calcula o tamanho do mapa
+window.addEventListener('load', function() {
+    setTimeout(resizeMap, 100);
 });
 
-// Recalcula o tamanho se a pessoa girar o celular
+// Recalcula se a barra do navegador do celular sumir/aparecer
+window.addEventListener('resize', function() {
+    setTimeout(resizeMap, 100);
+});
+
+// Recalcula se a pessoa girar o celular
 window.addEventListener('orientationchange', function() {
-    setTimeout(function() {
-        if (map) {
-            map.invalidateSize();
-        }
-    }, 300);
+    setTimeout(resizeMap, 100);
 });
