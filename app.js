@@ -1,4 +1,6 @@
-// Variáveis Globais
+// ======================================================
+// VARIÁVEIS GLOBAIS
+// ======================================================
 let map;
 let watchId = null;
 let isPaused = false;
@@ -14,7 +16,9 @@ let wakeLock = null;
 let currentHeading = 0;
 let routeId = "";
 
-// Ícone da Seta (SVG) - Bússola
+// ======================================================
+// ÍCONES (BÚSSOLA E MARCADOR INICIAL)
+// ======================================================
 const arrowIcon = L.divIcon({
     className: 'compass-marker',
     html: `<svg class="compass-arrow" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
@@ -24,7 +28,6 @@ const arrowIcon = L.divIcon({
     iconAnchor: [20, 20]
 });
 
-// Ícone Azul Inicial (Ponto)
 const initialDotIcon = L.divIcon({
     className: 'initial-dot-marker',
     html: `<div style="width: 20px; height: 20px; background: #007bff; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
@@ -32,7 +35,9 @@ const initialDotIcon = L.divIcon({
     iconAnchor: [10, 10]
 });
 
-// Limpar nome de arquivo
+// ======================================================
+// FUNÇÕES UTILITÁRIAS
+// ======================================================
 function sanitizeFilename(name) {
     if (!name) return "sem_descricao";
     return name
@@ -42,21 +47,33 @@ function sanitizeFilename(name) {
         .replace(/\s+/g, '_');
 }
 
-// Gerar ID único do Roteiro
 function generateRouteId() {
     const date = new Date();
     const format = (n) => n.toString().padStart(2, '0');
     return `ROUTE_${date.getFullYear()}${format(date.getMonth()+1)}${format(date.getDate())}${format(date.getHours())}${format(date.getMinutes())}${format(date.getSeconds())}`;
 }
 
-// Inicializar Mapa
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; 
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+// ======================================================
+// INICIALIZAÇÃO DO MAPA
+// ======================================================
 function initMap() {
     map = L.map('map').setView([-15.7801, -47.9292], 4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // (3) Marcador inicial assim que o app abre
+    // Marcador inicial azul assim que o app abre
     map.locate({setView: true, maxZoom: 16});
     
     function onLocationFound(e) {
@@ -68,7 +85,6 @@ function initMap() {
     loadExternalLayers();
 }
 
-// Carregar arquivos GeoJSON
 function loadExternalLayers() {
     const layers = [
         { file: 'layers/pontos.geojson', color: 'blue' },
@@ -109,7 +125,9 @@ function loadExternalLayers() {
     });
 }
 
-// Manter tela acesa
+// ======================================================
+// WAKE LOCK E BÚSSOLA
+// ======================================================
 async function requestWakeLock() {
     try {
         if ('wakeLock' in navigator) {
@@ -118,7 +136,6 @@ async function requestWakeLock() {
     } catch (err) { console.log('Wake Lock não suportado'); }
 }
 
-// PERMISSÃO DA BÚSSOLA
 function requestCompassPermission() {
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
@@ -160,19 +177,9 @@ function updateMarkerRotation() {
     }
 }
 
-// Distância (Haversine)
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; 
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-}
-
-// START
+// ======================================================
+// EVENTOS DOS BOTÕES
+// ======================================================
 document.getElementById('btn-start').addEventListener('click', () => {
     if (watchId) return;
     
@@ -181,11 +188,11 @@ document.getElementById('btn-start').addEventListener('click', () => {
     totalDistance = 0;
     startTime = Date.now();
     isPaused = false;
-    routeId = generateRouteId(); // Gera o ID do Roteiro
+    routeId = generateRouteId();
 
     if (currentPolyline) map.removeLayer(currentPolyline);
     if (marker) { map.removeLayer(marker); marker = null; }
-    if (initialLocationMarker) map.removeLayer(initialLocationMarker); // Limpa o azul fixo
+    if (initialLocationMarker) map.removeLayer(initialLocationMarker);
 
     requestWakeLock();
     requestCompassPermission();
@@ -203,7 +210,7 @@ document.getElementById('btn-start').addEventListener('click', () => {
 
             routeCoords.push({ lat: latitude, lng: longitude });
             
-            // (1) Adiciona o ID em cada um dos registros da memória
+            // Adiciona o ID em cada um dos registros da memória
             routeData.push({ 
                 id: routeId, 
                 lat: latitude, 
@@ -243,13 +250,11 @@ document.getElementById('btn-start').addEventListener('click', () => {
     document.getElementById('btn-stop').disabled = false;
 });
 
-// PAUSE / RESUME
 document.getElementById('btn-pause').addEventListener('click', (e) => {
     isPaused = !isPaused;
     e.target.innerText = isPaused ? "RESUME" : "PAUSE";
 });
 
-// STOP
 document.getElementById('btn-stop').addEventListener('click', () => {
     if (navigator.geolocation && watchId) {
         navigator.geolocation.clearWatch(watchId);
@@ -264,20 +269,20 @@ document.getElementById('btn-stop').addEventListener('click', () => {
     }
 });
 
-// CONTINUAR
 document.getElementById('btn-continue').addEventListener('click', () => {
     document.getElementById('stop-modal').classList.add('hidden');
     document.getElementById('result-modal').classList.remove('hidden');
 });
 
-// Download CSV
+// ======================================================
+// DOWNLOADS
+// ======================================================
 document.getElementById('btn-csv').addEventListener('click', () => {
     let csv = "id,dia,hora,timestamp,lat,lon,accuracy\n";
     routeData.forEach(row => {
         const date = new Date(row.timestamp);
         const dia = date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
         const hora = date.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        // Garante que o ID estará na coluna
         csv += `${row.id},${dia},${hora},${row.timestamp},${row.lat},${row.lon},${row.accuracy}\n`;
     });
     
@@ -293,9 +298,7 @@ document.getElementById('btn-csv').addEventListener('click', () => {
     window.URL.revokeObjectURL(url);
 });
 
-// Download SHP (Corrigido para versão 0.4.3)
-document.getElementById('btn-shp').addEventListener('click', () => {
-    // Exige pelo menos 2 pontos para criar uma linha
+document.getElementById('btn-shp').addEventListener('click', async () => {
     if (routeData.length < 2) {
         alert("Caminhe um pouco para registrar pelo menos 2 pontos antes de baixar o SHP.");
         return;
@@ -304,7 +307,6 @@ document.getElementById('btn-shp').addEventListener('click', () => {
     const rawDesc = document.getElementById('route-description').value || "Sem_descricao";
     const desc = sanitizeFilename(rawDesc);
     
-    // Força a conversão para Número
     const coordinatesArray = routeData.map(p => [Number(p.lon), Number(p.lat)]);
     
     const geojson = {
@@ -324,52 +326,35 @@ document.getElementById('btn-shp').addEventListener('click', () => {
     
     try {
         if (typeof shpwrite === 'undefined') {
-            alert("Erro: Biblioteca SHP não carregou. Verifique se o arquivo 'shpwrite.min.js' está na pasta libs.");
+            alert("Erro: Biblioteca SHP não carregou. Verifique a pasta libs.");
             return;
         }
 
-        // Na versão 0.4.3, shpwrite.zip retorna uma Promise
-        shpwrite.zip(geojson).then(function(content) {
-            let blob;
-            
-            // Se vier como string Base64, converte para Blob
-            if (typeof content === 'string') {
-                let byteString = content;
-                if (byteString.startsWith('data:application/zip;base64,')) {
-                    byteString = byteString.split(',')[1];
-                }
-                const byteNumbers = new Array(byteString.length);
-                for (let i = 0; i < byteString.length; i++) {
-                    byteNumbers[i] = byteString.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                blob = new Blob([byteArray], { type: 'application/zip' });
-            } else {
-                // Se já for um Blob, usa diretamente
-                blob = content;
-            }
-
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `trajeto_${desc}_${routeId}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }, 100);
-        }).catch(function(err) {
-            console.error("Erro SHP:", err);
-            alert("Erro ao gerar SHP: " + err.message);
+        // SOLUÇÃO DEFINITIVA: Usar outputType: "blob"
+        const zipBlob = await shpwrite.zip(geojson, {
+            folder: "trajeto",
+            filename: `trajeto_${desc}_${routeId}`,
+            outputType: "blob"
         });
+
+        const url = window.URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `trajeto_${desc}_${routeId}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 100);
+        
     } catch (err) {
         console.error("Erro SHP:", err);
         alert("Erro ao gerar SHP: " + err.message);
     }
 });
 
-// NOVO TRAJETO
 document.getElementById('btn-new').addEventListener('click', () => {
     document.getElementById('result-modal').classList.add('hidden');
     document.getElementById('btn-start').disabled = false;
@@ -387,10 +372,26 @@ document.getElementById('btn-new').addEventListener('click', () => {
     map.locate({setView: true, maxZoom: 16});
 });
 
-// Iniciar App
+// ======================================================
+// INICIAR APLICAÇÃO
+// ======================================================
 initMap();
 
-// CORREÇÃO DO MAPA CORTADO: Recalcula o tamanho se a tela mudar (ex: barra do navegador sumir)
-window.addEventListener('resize', () => {
-    if (map) map.invalidateSize();
+// CORREÇÃO DO MAPA CORTADO: Força o Leaflet a recalcular o tamanho da tela 
+// depois que o navegador do celular termina de carregar 100%
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 300);
+});
+
+// Recalcula se a pessoa girar o celular
+window.addEventListener('orientationchange', function() {
+    setTimeout(function() {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 300);
 });
