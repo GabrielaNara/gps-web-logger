@@ -12,7 +12,7 @@ let timerInterval;
 let wakeLock = null;
 let currentHeading = 0;
 
-// Ícone da Seta (SVG)
+// Ícone da Seta (SVG) - Bússola
 const arrowIcon = L.divIcon({
     className: 'compass-marker',
     html: `<svg class="compass-arrow" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
@@ -54,8 +54,8 @@ function initMap() {
 // Carregar arquivos GeoJSON
 function loadExternalLayers() {
     const layers = [
-        { file: 'layers/pontos.geojson', color: 'blue' },
-        { file: 'layers/teste_edificacao.geojson', color: 'green' }
+        { file: 'layers/camada_escolas.geojson', color: 'blue' },
+        { file: 'layers/camada_ruas.geojson', color: 'green' }
     ];
 
     layers.forEach(layerInfo => {
@@ -104,6 +104,7 @@ async function requestWakeLock() {
 // PEDIDO DE PERMISSÃO DA BÚSSOLA (necessário para iPhone)
 function requestCompassPermission() {
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ exige clique
         DeviceOrientationEvent.requestPermission()
             .then(permissionState => {
                 if (permissionState === 'granted') {
@@ -133,14 +134,18 @@ function handleDeviceOrientation(event) {
 
     if (heading !== null) {
         currentHeading = heading;
-        // Atualiza a rotação da seta no mapa
-        if (marker) {
-            const markerEl = marker.getElement();
-            if (markerEl) {
-                const arrow = markerEl.querySelector('.compass-arrow');
-                if (arrow) {
-                    arrow.style.transform = `rotate(${currentHeading}deg)`;
-                }
+        updateMarkerRotation();
+    }
+}
+
+// Atualizar a rotação da seta no mapa
+function updateMarkerRotation() {
+    if (marker) {
+        const markerEl = marker.getElement();
+        if (markerEl) {
+            const arrow = markerEl.querySelector('.compass-arrow');
+            if (arrow) {
+                arrow.style.transform = `rotate(${currentHeading}deg)`;
             }
         }
     }
@@ -172,7 +177,7 @@ document.getElementById('btn-start').addEventListener('click', () => {
     if (marker) map.removeLayer(marker);
 
     requestWakeLock();
-    requestCompassPermission(); // Pede a bússola ao clicar em START
+    requestCompassPermission();
 
     watchId = navigator.geolocation.watchPosition(
         (position) => {
@@ -194,8 +199,15 @@ document.getElementById('btn-start').addEventListener('click', () => {
             if (currentPolyline) map.removeLayer(currentPolyline);
             currentPolyline = L.polyline(routeCoords, {color: 'red', weight: 4}).addTo(map);
             
-            if (marker) map.removeLayer(marker);
-            marker = L.marker([latitude, longitude], { icon: arrowIcon }).addTo(map);
+            // CORREÇÃO: Apenas atualiza a posição do marcador, sem destruí-lo
+            // Isso impede que a seta da bússola resete a cada segundo
+            if (marker) {
+                marker.setLatLng([latitude, longitude]);
+            } else {
+                marker = L.marker([latitude, longitude], { icon: arrowIcon }).addTo(map);
+            }
+            updateMarkerRotation(); // Aplica a rotação assim que o marcador aparece
+            
             map.setView([latitude, longitude], 18);
         },
         (error) => alert("Erro ao obter localização: " + error.message),
@@ -243,10 +255,8 @@ document.getElementById('btn-continue').addEventListener('click', () => {
 
 // Download CSV
 document.getElementById('btn-csv').addEventListener('click', () => {
-    // Colunas atualizadas: dia, hora, timestamp, lat, lon, accuracy
     let csv = "dia,hora,timestamp,lat,lon,accuracy\n";
     routeData.forEach(row => {
-        // Conversão para Fuso de São Paulo (America/Sao_Paulo)
         const date = new Date(row.timestamp);
         const dia = date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
         const hora = date.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -265,9 +275,9 @@ document.getElementById('btn-csv').addEventListener('click', () => {
     window.URL.revokeObjectURL(url);
 });
 
-// Download SHP
+// Download SHP (Corrigido)
 document.getElementById('btn-shp').addEventListener('click', () => {
-    const rawDesc = document.getElementById('route-description').value || "Sem descricao";
+    const rawDesc = document.getElementById('route-description').value || "Sem_descricao";
     const desc = sanitizeFilename(rawDesc);
     
     const geojson = {
@@ -279,37 +289,57 @@ document.getElementById('btn-shp').addEventListener('click', () => {
         }]
     };
     
-    // shpwrite.zip retorna uma string Base64 em versões mais antigas
-    Promise.resolve(shpwrite.zip(geojson)).then(content => {
-        let blob;
-        
-        // Verifica se o retorno é uma string Base64 ou um Blob
-        if (typeof content === 'string') {
-            // Converte Base64 para Blob (resolve o problema de não baixar no mobile)
-            const byteCharacters = atob(content);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
+    try {
+        // shpwrite.zip usa callback na versão padrão, vamos garantir que funcione em qualquer versão
+        const downloadContent = (content) => {
+            let blob;
+            
+            // Se for uma string (Base64), converte para Blob
+            if (typeof content === 'string') {
+                const byteCharacters = atob(content);
+                const byteArrays = [];
+                for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+                    const slice = byteCharacters.slice(offset, offset + 512);
+                    const byteNumbers = new Array(slice.length);
+                    for (let i = 0; i < slice.length; i++) {
+                        byteNumbers[i] = slice.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    byteArrays.push(byteArray);
+                }
+                blob = new Blob(byteArrays, { type: 'application/zip' });
+            } else {
+                // Se já for um Blob
+                blob = content;
             }
-            const byteArray = new Uint8Array(byteNumbers);
-            blob = new Blob([byteArray], { type: 'application/zip' });
-        } else {
-            // Se já for um Blob
-            blob = content;
-        }
 
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `trajeto_${desc}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-    }).catch(err => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `trajeto_${desc}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        };
+
+        // Tenta usar callback primeiro (forma original da lib)
+        if (shpwrite.zip.length >= 2) {
+            shpwrite.zip(geojson, function(err, content) {
+                if (err) throw err;
+                downloadContent(content);
+            });
+        } else {
+            // Se não tiver callback, chama direto
+            const content = shpwrite.zip(geojson);
+            downloadContent(content);
+        }
+    } catch (err) {
         alert("Erro ao gerar SHP: " + err.message);
         console.error(err);
-    });
+    }
 });
 
 // NOVO TRAJETO
