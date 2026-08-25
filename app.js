@@ -6,11 +6,13 @@ let routeCoords = [];
 let routeData = []; 
 let currentPolyline;
 let marker;
+let initialLocationMarker; // Marcador azul inicial
 let startTime;
 let totalDistance = 0;
 let timerInterval;
 let wakeLock = null;
 let currentHeading = 0;
+let routeId = ""; // ID único do roteiro
 
 // Ícone da Seta (SVG) - Bússola
 const arrowIcon = L.divIcon({
@@ -32,6 +34,13 @@ function sanitizeFilename(name) {
         .replace(/\s+/g, '_');
 }
 
+// Gerar ID único do Roteiro baseado no horário
+function generateRouteId() {
+    const date = new Date();
+    const format = (n) => n.toString().padStart(2, '0');
+    return `ROUTE_${date.getFullYear()}${format(date.getMonth()+1)}${format(date.getDate())}${format(date.getHours())}${format(date.getMinutes())}${format(date.getSeconds())}`;
+}
+
 // Inicializar Mapa
 function initMap() {
     map = L.map('map').setView([-15.7801, -47.9292], 4);
@@ -39,14 +48,18 @@ function initMap() {
         attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            const { latitude, longitude } = position.coords;
-            map.setView([latitude, longitude], 16);
-        },
-        (error) => { console.log("Não foi possível obter a localização inicial."); },
-        { enableHighAccuracy: true, timeout: 10000 }
-    );
+    // (3) Centralizar e mostrar localização assim que o app abre
+    map.locate({setView: true, maxZoom: 16});
+    map.on('locationfound', (e) => {
+        // Adiciona um círculo azul mostrando a posição inicial
+        if (initialLocationMarker) map.removeLayer(initialLocationMarker);
+        initialLocationMarker = L.circle(e.latlng, {
+            radius: e.accuracy / 2,
+            color: '#007bff',
+            fillColor: '#007bff',
+            fillOpacity: 0.2
+        }).addTo(map).bindPopup("Você está aqui");
+    });
 
     loadExternalLayers();
 }
@@ -101,10 +114,9 @@ async function requestWakeLock() {
     } catch (err) { console.log('Wake Lock não suportado'); }
 }
 
-// PEDIDO DE PERMISSÃO DA BÚSSOLA (necessário para iPhone)
+// PEDIDO DE PERMISSÃO DA BÚSSOLA
 function requestCompassPermission() {
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+ exige clique
         DeviceOrientationEvent.requestPermission()
             .then(permissionState => {
                 if (permissionState === 'granted') {
@@ -113,7 +125,6 @@ function requestCompassPermission() {
             })
             .catch(console.error);
     } else if (typeof DeviceOrientationEvent !== 'undefined') {
-        // Android não precisa de permissão explícita
         window.addEventListener('deviceorientationabsolute', handleDeviceOrientation, true);
         window.addEventListener('deviceorientation', handleDeviceOrientation, true);
     }
@@ -122,13 +133,9 @@ function requestCompassPermission() {
 // Capturar giro do celular
 function handleDeviceOrientation(event) {
     let heading = null;
-    
-    // iOS (webkitCompassHeading) já vem em graus (0 a 360) relativo ao Norte
     if (event.webkitCompassHeading) {
         heading = event.webkitCompassHeading;
-    } 
-    // Android (alpha) vem em rotação matemática, precisa inverter
-    else if (event.absolute === true || event.alpha !== null) {
+    } else if (event.absolute === true || event.alpha !== null) {
         heading = 360 - event.alpha;
     }
 
@@ -138,7 +145,6 @@ function handleDeviceOrientation(event) {
     }
 }
 
-// Atualizar a rotação da seta no mapa
 function updateMarkerRotation() {
     if (marker) {
         const markerEl = marker.getElement();
@@ -172,9 +178,11 @@ document.getElementById('btn-start').addEventListener('click', () => {
     totalDistance = 0;
     startTime = Date.now();
     isPaused = false;
+    routeId = generateRouteId(); // Gera o ID do roteiro
 
     if (currentPolyline) map.removeLayer(currentPolyline);
     if (marker) map.removeLayer(marker);
+    if (initialLocationMarker) map.removeLayer(initialLocationMarker); // Remove o círculo azul inicial
 
     requestWakeLock();
     requestCompassPermission();
@@ -199,14 +207,12 @@ document.getElementById('btn-start').addEventListener('click', () => {
             if (currentPolyline) map.removeLayer(currentPolyline);
             currentPolyline = L.polyline(routeCoords, {color: 'red', weight: 4}).addTo(map);
             
-            // CORREÇÃO: Apenas atualiza a posição do marcador, sem destruí-lo
-            // Isso impede que a seta da bússola resete a cada segundo
             if (marker) {
                 marker.setLatLng([latitude, longitude]);
             } else {
                 marker = L.marker([latitude, longitude], { icon: arrowIcon }).addTo(map);
             }
-            updateMarkerRotation(); // Aplica a rotação assim que o marcador aparece
+            updateMarkerRotation();
             
             map.setView([latitude, longitude], 18);
         },
@@ -255,12 +261,13 @@ document.getElementById('btn-continue').addEventListener('click', () => {
 
 // Download CSV
 document.getElementById('btn-csv').addEventListener('click', () => {
-    let csv = "dia,hora,timestamp,lat,lon,accuracy\n";
+    // Adicionado a coluna 'id' no cabeçalho e nos dados
+    let csv = "id,dia,hora,timestamp,lat,lon,accuracy\n";
     routeData.forEach(row => {
         const date = new Date(row.timestamp);
         const dia = date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
         const hora = date.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        csv += `${dia},${hora},${row.timestamp},${row.lat},${row.lon},${row.accuracy}\n`;
+        csv += `${routeId},${dia},${hora},${row.timestamp},${row.lat},${row.lon},${row.accuracy}\n`;
     });
     
     const desc = sanitizeFilename(document.getElementById('route-description').value);
@@ -268,14 +275,14 @@ document.getElementById('btn-csv').addEventListener('click', () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `trajeto_${desc}.csv`;
+    a.download = `trajeto_${desc}_${routeId}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 });
 
-// Download SHP (Corrigido)
+// Download SHP
 document.getElementById('btn-shp').addEventListener('click', () => {
     const rawDesc = document.getElementById('route-description').value || "Sem_descricao";
     const desc = sanitizeFilename(rawDesc);
@@ -285,16 +292,14 @@ document.getElementById('btn-shp').addEventListener('click', () => {
         features: [{
             type: "Feature",
             geometry: { type: "LineString", coordinates: routeData.map(p => [p.lon, p.lat]) },
-            properties: { descricao: rawDesc }
+            // Adicionado o ID também nas propriedades do SHP
+            properties: { id: routeId, descricao: rawDesc }
         }]
     };
     
     try {
-        // shpwrite.zip usa callback na versão padrão, vamos garantir que funcione em qualquer versão
         const downloadContent = (content) => {
             let blob;
-            
-            // Se for uma string (Base64), converte para Blob
             if (typeof content === 'string') {
                 const byteCharacters = atob(content);
                 const byteArrays = [];
@@ -309,14 +314,13 @@ document.getElementById('btn-shp').addEventListener('click', () => {
                 }
                 blob = new Blob(byteArrays, { type: 'application/zip' });
             } else {
-                // Se já for um Blob
                 blob = content;
             }
 
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `trajeto_${desc}.zip`;
+            a.download = `trajeto_${desc}_${routeId}.zip`;
             document.body.appendChild(a);
             a.click();
             setTimeout(() => {
@@ -325,14 +329,18 @@ document.getElementById('btn-shp').addEventListener('click', () => {
             }, 100);
         };
 
-        // Tenta usar callback primeiro (forma original da lib)
+        // Verifica se a variável global foi carregada
+        if (typeof shpwrite === 'undefined') {
+            alert("Erro: Biblioteca SHP não carregou. Verifique o link no index.html.");
+            return;
+        }
+
         if (shpwrite.zip.length >= 2) {
             shpwrite.zip(geojson, function(err, content) {
                 if (err) throw err;
                 downloadContent(content);
             });
         } else {
-            // Se não tiver callback, chama direto
             const content = shpwrite.zip(geojson);
             downloadContent(content);
         }
@@ -355,6 +363,9 @@ document.getElementById('btn-new').addEventListener('click', () => {
     document.getElementById('route-description').value = '';
     if (currentPolyline) map.removeLayer(currentPolyline);
     if (marker) map.removeLayer(marker);
+    
+    // Busca a localização inicial novamente para o mapa não ficar vazio
+    map.locate({setView: true, maxZoom: 16});
 });
 
 // Iniciar App
