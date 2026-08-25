@@ -24,6 +24,14 @@ const arrowIcon = L.divIcon({
     iconAnchor: [20, 20]
 });
 
+// Ícone Azul Inicial (Ponto)
+const initialDotIcon = L.divIcon({
+    className: 'initial-dot-marker',
+    html: `<div style="width: 20px; height: 20px; background: #007bff; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10]
+});
+
 // Limpar nome de arquivo
 function sanitizeFilename(name) {
     if (!name) return "sem_descricao";
@@ -48,17 +56,15 @@ function initMap() {
         attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // (3) Centralizar e mostrar localização assim que o app abre
+    // (3) Marcador inicial assim que o app abre
     map.locate({setView: true, maxZoom: 16});
-    map.on('locationfound', (e) => {
+    
+    function onLocationFound(e) {
         if (initialLocationMarker) map.removeLayer(initialLocationMarker);
-        initialLocationMarker = L.circle(e.latlng, {
-            radius: e.accuracy / 2,
-            color: '#007bff',
-            fillColor: '#007bff',
-            fillOpacity: 0.2
-        }).addTo(map).bindPopup("Você está aqui");
-    });
+        // Adiciona um marcador de ponto azul fixo
+        initialLocationMarker = L.marker(e.latlng, { icon: initialDotIcon }).addTo(map).bindPopup("Você está aqui");
+    }
+    map.on('locationfound', onLocationFound);
 
     loadExternalLayers();
 }
@@ -176,11 +182,11 @@ document.getElementById('btn-start').addEventListener('click', () => {
     totalDistance = 0;
     startTime = Date.now();
     isPaused = false;
-    routeId = generateRouteId(); // Gera o ID
+    routeId = generateRouteId(); // Gera o ID do Roteiro
 
     if (currentPolyline) map.removeLayer(currentPolyline);
-    if (marker) { map.removeLayer(marker); marker = null; } // Limpa qualquer marcador antigo
-    if (initialLocationMarker) map.removeLayer(initialLocationMarker);
+    if (marker) { map.removeLayer(marker); marker = null; }
+    if (initialLocationMarker) map.removeLayer(initialLocationMarker); // Limpa o azul fixo
 
     requestWakeLock();
     requestCompassPermission();
@@ -198,7 +204,7 @@ document.getElementById('btn-start').addEventListener('click', () => {
 
             routeCoords.push({ lat: latitude, lng: longitude });
             
-            // (1) Adiciona o ID em cada linha dos dados coletados
+            // (1) Adiciona o ID em cada um dos registros da memória
             routeData.push({ 
                 id: routeId, 
                 lat: latitude, 
@@ -213,7 +219,6 @@ document.getElementById('btn-start').addEventListener('click', () => {
             if (currentPolyline) map.removeLayer(currentPolyline);
             currentPolyline = L.polyline(routeCoords, {color: 'red', weight: 4}).addTo(map);
             
-            // (3) Garante que o marcador será criado na primeira vez e apenas movido depois
             if (!marker) {
                 marker = L.marker([latitude, longitude], { icon: arrowIcon }).addTo(map);
             } else {
@@ -273,11 +278,12 @@ document.getElementById('btn-csv').addEventListener('click', () => {
         const date = new Date(row.timestamp);
         const dia = date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
         const hora = date.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        // Garante que o ID estará na coluna
         csv += `${row.id},${dia},${hora},${row.timestamp},${row.lat},${row.lon},${row.accuracy}\n`;
     });
     
     const desc = sanitizeFilename(document.getElementById('route-description').value);
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -290,7 +296,7 @@ document.getElementById('btn-csv').addEventListener('click', () => {
 
 // Download SHP (Corrigido)
 document.getElementById('btn-shp').addEventListener('click', () => {
-    // (2) O SHP precisa de pelo menos 2 pontos para formar uma linha
+    // (2) Exige pelo menos 2 pontos para criar uma linha
     if (routeData.length < 2) {
         alert("Caminhe um pouco para registrar pelo menos 2 pontos antes de baixar o SHP.");
         return;
@@ -299,12 +305,21 @@ document.getElementById('btn-shp').addEventListener('click', () => {
     const rawDesc = document.getElementById('route-description').value || "Sem_descricao";
     const desc = sanitizeFilename(rawDesc);
     
+    // Força a conversão para Número para evitar erro de variável indefinida na biblioteca
+    const coordinatesArray = routeData.map(p => [Number(p.lon), Number(p.lat)]);
+    
     const geojson = {
         type: "FeatureCollection",
         features: [{
             type: "Feature",
-            geometry: { type: "LineString", coordinates: routeData.map(p => [p.lon, p.lat]) },
-            properties: { id: routeId, descricao: rawDesc }
+            geometry: { 
+                type: "LineString", 
+                coordinates: coordinatesArray 
+            },
+            properties: { 
+                id: routeId, 
+                descricao: rawDesc 
+            }
         }]
     };
     
@@ -314,10 +329,8 @@ document.getElementById('btn-shp').addEventListener('click', () => {
             return;
         }
 
-        // shpwrite.zip(geojson) retorna uma string Base64
         const base64Data = shpwrite.zip(geojson);
         
-        // Converte Base64 para Blob
         let byteString = base64Data;
         if (byteString.startsWith('data:application/zip;base64,')) {
             byteString = byteString.split(',')[1];
@@ -360,7 +373,7 @@ document.getElementById('btn-new').addEventListener('click', () => {
     if (currentPolyline) map.removeLayer(currentPolyline);
     if (marker) { map.removeLayer(marker); marker = null; }
     
-    // Busca a localização inicial novamente
+    // Reativa o marcador azul inicial
     map.locate({setView: true, maxZoom: 16});
 });
 
