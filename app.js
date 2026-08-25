@@ -293,9 +293,9 @@ document.getElementById('btn-csv').addEventListener('click', () => {
     window.URL.revokeObjectURL(url);
 });
 
-// Download SHP (Corrigido)
+// Download SHP (Corrigido para versão 0.4.3)
 document.getElementById('btn-shp').addEventListener('click', () => {
-    // (2) Exige pelo menos 2 pontos para criar uma linha
+    // Exige pelo menos 2 pontos para criar uma linha
     if (routeData.length < 2) {
         alert("Caminhe um pouco para registrar pelo menos 2 pontos antes de baixar o SHP.");
         return;
@@ -304,7 +304,7 @@ document.getElementById('btn-shp').addEventListener('click', () => {
     const rawDesc = document.getElementById('route-description').value || "Sem_descricao";
     const desc = sanitizeFilename(rawDesc);
     
-    // Força a conversão para Número para evitar erro de variável indefinida na biblioteca
+    // Força a conversão para Número
     const coordinatesArray = routeData.map(p => [Number(p.lon), Number(p.lat)]);
     
     const geojson = {
@@ -328,30 +328,41 @@ document.getElementById('btn-shp').addEventListener('click', () => {
             return;
         }
 
-        const base64Data = shpwrite.zip(geojson);
-        
-        let byteString = base64Data;
-        if (byteString.startsWith('data:application/zip;base64,')) {
-            byteString = byteString.split(',')[1];
-        }
-        
-        const byteNumbers = new Array(byteString.length);
-        for (let i = 0; i < byteString.length; i++) {
-            byteNumbers[i] = byteString.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'application/zip' });
+        // Na versão 0.4.3, shpwrite.zip retorna uma Promise
+        shpwrite.zip(geojson).then(function(content) {
+            let blob;
+            
+            // Se vier como string Base64, converte para Blob
+            if (typeof content === 'string') {
+                let byteString = content;
+                if (byteString.startsWith('data:application/zip;base64,')) {
+                    byteString = byteString.split(',')[1];
+                }
+                const byteNumbers = new Array(byteString.length);
+                for (let i = 0; i < byteString.length; i++) {
+                    byteNumbers[i] = byteString.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                blob = new Blob([byteArray], { type: 'application/zip' });
+            } else {
+                // Se já for um Blob, usa diretamente
+                blob = content;
+            }
 
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `trajeto_${desc}_${routeId}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }, 100);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `trajeto_${desc}_${routeId}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        }).catch(function(err) {
+            console.error("Erro SHP:", err);
+            alert("Erro ao gerar SHP: " + err.message);
+        });
     } catch (err) {
         console.error("Erro SHP:", err);
         alert("Erro ao gerar SHP: " + err.message);
@@ -378,3 +389,8 @@ document.getElementById('btn-new').addEventListener('click', () => {
 
 // Iniciar App
 initMap();
+
+// CORREÇÃO DO MAPA CORTADO: Recalcula o tamanho se a tela mudar (ex: barra do navegador sumir)
+window.addEventListener('resize', () => {
+    if (map) map.invalidateSize();
+});
