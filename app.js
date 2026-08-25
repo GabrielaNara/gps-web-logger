@@ -54,8 +54,8 @@ function initMap() {
 // Carregar arquivos GeoJSON
 function loadExternalLayers() {
     const layers = [
-        { file: 'layers/camada_escolas.geojson', color: 'blue' },
-        { file: 'layers/camada_ruas.geojson', color: 'green' }
+        { file: 'layers/pontos.geojson', color: 'blue' },
+        { file: 'layers/teste_edificacao.geojson', color: 'green' }
     ];
 
     layers.forEach(layerInfo => {
