@@ -23,7 +23,6 @@ html, body {
     left: 0;
     right: 0;
     width: 100%;
-    height: auto; /* Deixa a altura ser calculada pelo top e bottom */
     z-index: 1;
     background: #ddd;
 }

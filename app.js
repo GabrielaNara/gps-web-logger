@@ -379,6 +379,16 @@ initMap();
 
 // CORREÇÃO DO MAPA CORTADO: Força o Leaflet a recalcular o tamanho da tela 
 // depois que o navegador do celular termina de carregar 100%
+// ======================================================
+// INICIAR APLICAÇÃO
+// ======================================================
+
+// Inicializa o mapa
+initMap();
+
+// CORREÇÃO DO MAPA CORTADO: 
+// Espera a página carregar 100% e dá um atraso de 300ms 
+// para o navegador do celular terminar de esconder a barra de URL.
 window.addEventListener('load', function() {
     setTimeout(function() {
         if (map) {
@@ -387,7 +397,7 @@ window.addEventListener('load', function() {
     }, 300);
 });
 
-// Recalcula se a pessoa girar o celular
+// Recalcula o tamanho se a pessoa girar o celular
 window.addEventListener('orientationchange', function() {
     setTimeout(function() {
         if (map) {
