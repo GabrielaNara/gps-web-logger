@@ -61,7 +61,6 @@ function initMap() {
     
     function onLocationFound(e) {
         if (initialLocationMarker) map.removeLayer(initialLocationMarker);
-        // Adiciona um marcador de ponto azul fixo
         initialLocationMarker = L.marker(e.latlng, { icon: initialDotIcon }).addTo(map).bindPopup("Você está aqui");
     }
     map.on('locationfound', onLocationFound);
@@ -325,7 +324,7 @@ document.getElementById('btn-shp').addEventListener('click', () => {
     
     try {
         if (typeof shpwrite === 'undefined') {
-            alert("Erro: Biblioteca SHP não carregou. Verifique sua internet.");
+            alert("Erro: Biblioteca SHP não carregou. Verifique se o arquivo 'shpwrite.min.js' está na pasta libs.");
             return;
         }
 
