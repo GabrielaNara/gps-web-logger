@@ -10,25 +10,35 @@ let startTime;
 let totalDistance = 0;
 let timerInterval;
 let wakeLock = null;
+let currentHeading = 0;
 
-// Função para limpar o nome do arquivo (remove acentos e espaços)
+// Ícone da Seta (SVG)
+const arrowIcon = L.divIcon({
+    className: 'compass-marker',
+    html: `<svg class="compass-arrow" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 2 L28 30 L20 24 L12 30 Z" fill="#dc3545" stroke="white" stroke-width="2"/>
+           </svg>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20]
+});
+
+// Limpar nome de arquivo
 function sanitizeFilename(name) {
     if (!name) return "sem_descricao";
     return name
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove acentos
-        .replace(/[^a-zA-Z0-9\s]/g, '') // Remove caracteres especiais
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9\s]/g, '')
         .trim()
-        .replace(/\s+/g, '_'); // Troca espaços por underline
+        .replace(/\s+/g, '_');
 }
 
-// Inicializar Mapa e centralizar no usuário
+// Inicializar Mapa
 function initMap() {
     map = L.map('map').setView([-15.7801, -47.9292], 4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // 1. Centralizar no usuário assim que o app abre
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const { latitude, longitude } = position.coords;
@@ -38,18 +48,14 @@ function initMap() {
         { enableHighAccuracy: true, timeout: 10000 }
     );
 
-    // 2. Carregar as camadas da pasta layers
     loadExternalLayers();
 }
 
-// Carregar arquivos GeoJSON da pasta "layers"
+// Carregar arquivos GeoJSON
 function loadExternalLayers() {
-    // LISTA DE ARQUIVOS DA SUA PASTA LAYERS
-    // Altere os nomes abaixo para os nomes reais dos seus arquivos .geojson
     const layers = [
-        { file: 'layers/pontos.geojson', color: 'blue' },
-        { file: 'layers/teste_edificacao.geojson', color: 'green' },
-        // Adicione mais aqui seguindo o modelo
+        { file: 'layers/camada_escolas.geojson', color: 'blue' },
+        { file: 'layers/camada_ruas.geojson', color: 'green' }
     ];
 
     layers.forEach(layerInfo => {
@@ -60,13 +66,8 @@ function loadExternalLayers() {
             })
             .then(data => {
                 L.geoJSON(data, {
-                    style: {
-                        color: layerInfo.color,
-                        weight: 3,
-                        fillOpacity: 0.3
-                    },
+                    style: { color: layerInfo.color, weight: 3, fillOpacity: 0.3 },
                     pointToLayer: function (feature, latlng) {
-                        // Cria um círculo para pontos
                         return L.circleMarker(latlng, {
                             radius: 6,
                             fillColor: layerInfo.color,
@@ -76,7 +77,6 @@ function loadExternalLayers() {
                         });
                     },
                     onEachFeature: function (feature, layer) {
-                        // LÓGICA PARA CLICAR E VER ATRIBUTOS
                         if (feature.properties) {
                             let popupContent = '<div class="popup-attrs">';
                             for (let key in feature.properties) {
@@ -88,24 +88,65 @@ function loadExternalLayers() {
                     }
                 }).addTo(map);
             })
-            .catch(error => {
-                console.warn(error.message); // Avisa no console se o arquivo não existir
-            });
+            .catch(error => console.warn(error.message));
     });
 }
 
-// Manter a tela acesa no mobile
+// Manter tela acesa
 async function requestWakeLock() {
     try {
         if ('wakeLock' in navigator) {
             wakeLock = await navigator.wakeLock.request('screen');
         }
-    } catch (err) {
-        console.log('Wake Lock não suportado');
+    } catch (err) { console.log('Wake Lock não suportado'); }
+}
+
+// PEDIDO DE PERMISSÃO DA BÚSSOLA (necessário para iPhone)
+function requestCompassPermission() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+            .then(permissionState => {
+                if (permissionState === 'granted') {
+                    window.addEventListener('deviceorientation', handleDeviceOrientation);
+                }
+            })
+            .catch(console.error);
+    } else if (typeof DeviceOrientationEvent !== 'undefined') {
+        // Android não precisa de permissão explícita
+        window.addEventListener('deviceorientationabsolute', handleDeviceOrientation, true);
+        window.addEventListener('deviceorientation', handleDeviceOrientation, true);
     }
 }
 
-// Cálculo de Distância (Fórmula de Haversine)
+// Capturar giro do celular
+function handleDeviceOrientation(event) {
+    let heading = null;
+    
+    // iOS (webkitCompassHeading) já vem em graus (0 a 360) relativo ao Norte
+    if (event.webkitCompassHeading) {
+        heading = event.webkitCompassHeading;
+    } 
+    // Android (alpha) vem em rotação matemática, precisa inverter
+    else if (event.absolute === true || event.alpha !== null) {
+        heading = 360 - event.alpha;
+    }
+
+    if (heading !== null) {
+        currentHeading = heading;
+        // Atualiza a rotação da seta no mapa
+        if (marker) {
+            const markerEl = marker.getElement();
+            if (markerEl) {
+                const arrow = markerEl.querySelector('.compass-arrow');
+                if (arrow) {
+                    arrow.style.transform = `rotate(${currentHeading}deg)`;
+                }
+            }
+        }
+    }
+}
+
+// Distância (Haversine)
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3; 
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -131,6 +172,7 @@ document.getElementById('btn-start').addEventListener('click', () => {
     if (marker) map.removeLayer(marker);
 
     requestWakeLock();
+    requestCompassPermission(); // Pede a bússola ao clicar em START
 
     watchId = navigator.geolocation.watchPosition(
         (position) => {
@@ -153,7 +195,7 @@ document.getElementById('btn-start').addEventListener('click', () => {
             currentPolyline = L.polyline(routeCoords, {color: 'red', weight: 4}).addTo(map);
             
             if (marker) map.removeLayer(marker);
-            marker = L.marker([latitude, longitude]).addTo(map);
+            marker = L.marker([latitude, longitude], { icon: arrowIcon }).addTo(map);
             map.setView([latitude, longitude], 18);
         },
         (error) => alert("Erro ao obter localização: " + error.message),
@@ -201,9 +243,14 @@ document.getElementById('btn-continue').addEventListener('click', () => {
 
 // Download CSV
 document.getElementById('btn-csv').addEventListener('click', () => {
-    let csv = "lat,lon,timestamp,accuracy\n";
+    // Colunas atualizadas: dia, hora, timestamp, lat, lon, accuracy
+    let csv = "dia,hora,timestamp,lat,lon,accuracy\n";
     routeData.forEach(row => {
-        csv += `${row.lat},${row.lon},${row.timestamp},${row.accuracy}\n`;
+        // Conversão para Fuso de São Paulo (America/Sao_Paulo)
+        const date = new Date(row.timestamp);
+        const dia = date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        const hora = date.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        csv += `${dia},${hora},${row.timestamp},${row.lat},${row.lon},${row.accuracy}\n`;
     });
     
     const desc = sanitizeFilename(document.getElementById('route-description').value);
@@ -232,20 +279,36 @@ document.getElementById('btn-shp').addEventListener('click', () => {
         }]
     };
     
+    // shpwrite.zip retorna uma string Base64 em versões mais antigas
     Promise.resolve(shpwrite.zip(geojson)).then(content => {
-        let url;
+        let blob;
+        
+        // Verifica se o retorno é uma string Base64 ou um Blob
         if (typeof content === 'string') {
-            url = 'data:application/zip;base64,' + content;
+            // Converte Base64 para Blob (resolve o problema de não baixar no mobile)
+            const byteCharacters = atob(content);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            blob = new Blob([byteArray], { type: 'application/zip' });
         } else {
-            url = window.URL.createObjectURL(content);
+            // Se já for um Blob
+            blob = content;
         }
+
+        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `trajeto_${desc}.zip`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        if (typeof content !== 'string') window.URL.revokeObjectURL(url);
+        window.URL.revokeObjectURL(url);
+    }).catch(err => {
+        alert("Erro ao gerar SHP: " + err.message);
+        console.error(err);
     });
 });
 
