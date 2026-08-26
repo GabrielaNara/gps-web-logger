@@ -1,60 +1,208 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#ffffff">
-    
-    <title>Rastreador Mobile</title>
-    
-    <!-- BIBLIOTECAS LOCAIS (Certifique-se que a pasta 'libs' está com os 3 arquivos) -->
-    <link rel="stylesheet" href="libs/leaflet.css" />
-    <script src="libs/leaflet.js"></script>
-    <script src="libs/shpwrite.min.js"></script>
 
-    <link rel="stylesheet" href="style.css">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>GPS Web Logger</title>
+
+    <!-- Leaflet -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    ></script>
+
+    <!-- shp-write -->
+    <script
+        src="https://unpkg.com/@mapbox/shp-write@latest/shpwrite.js"
+    ></script>
+
+    <!-- CSS -->
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
 </head>
-<body>
-    <!-- Barra Superior -->
-    <div id="top-bar">
-        <div><span>Tempo:</span> <span id="time">0</span>s</div>
-        <div><span>Dist:</span> <span id="distance">0</span>m</div>
-        <div><span>Prec:</span> <span id="accuracy">-</span>m</div>
-    </div>
 
-    <!-- Mapa -->
+
+<body>
+
+    <!-- MAPA -->
+
     <div id="map"></div>
 
-    <!-- Barra Inferior -->
-    <div id="bottom-bar">
-        <button id="btn-start" class="btn-mobile">START</button>
-        <button id="btn-pause" class="btn-mobile" disabled>PAUSE</button>
-        <button id="btn-stop" class="btn-mobile" disabled>STOP</button>
-    </div>
 
-    <!-- Modal de Stop -->
-    <div id="stop-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2>Finalizar Trajeto</h2>
-            <input type="text" id="route-description" placeholder="Ex: teste10">
-            <button id="btn-continue" class="btn-mobile btn-confirm">CONTINUAR</button>
+    <!-- PAINEL SUPERIOR -->
+
+    <div id="infoPanel">
+
+        <div id="status">
+            Obtendo localização...
         </div>
-    </div>
 
-    <!-- Modal de Resultado -->
-    <div id="result-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2>Trajeto Concluído!</h2>
-            <div class="result-buttons">
-                <button id="btn-csv" class="btn-mobile">Download CSV</button>
-                <button id="btn-shp" class="btn-mobile">Download SHP</button>
-                <button id="btn-new" class="btn-mobile btn-new">NOVO TRAJETO</button>
+
+        <div class="infoRow">
+
+            <div>
+
+                <span class="label">
+                    Tempo
+                </span>
+
+                <strong id="duration">
+                    00:00:00
+                </strong>
+
             </div>
+
+
+            <div>
+
+                <span class="label">
+                    Distância
+                </span>
+
+                <strong id="distance">
+                    0 m
+                </strong>
+
+            </div>
+
+
+            <div>
+
+                <span class="label">
+                    Precisão
+                </span>
+
+                <strong id="accuracy">
+                    --
+                </strong>
+
+            </div>
+
         </div>
+
     </div>
+
+
+    <!-- CONTROLES -->
+
+    <div id="controls">
+
+        <button
+            id="startBtn"
+        >
+            START
+        </button>
+
+
+        <button
+            id="pauseBtn"
+            disabled
+        >
+            PAUSE
+        </button>
+
+
+        <button
+            id="stopBtn"
+            disabled
+        >
+            STOP
+        </button>
+
+    </div>
+
+
+    <!-- MODAL DE DESCRIÇÃO -->
+
+    <div
+        id="metadataPanel"
+        class="modal hidden"
+    >
+
+        <div class="modalContent">
+
+            <h2>
+                Trajeto finalizado
+            </h2>
+
+
+            <p>
+                Adicione uma descrição opcional para o trajeto.
+            </p>
+
+
+            <textarea
+                id="description"
+                placeholder="Descrição do trajeto..."
+            ></textarea>
+
+
+            <button
+                id="saveMetadataBtn"
+            >
+                CONTINUAR
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- MODAL DE EXPORTAÇÃO -->
+
+    <div
+        id="exportPanel"
+        class="modal hidden"
+    >
+
+        <div class="modalContent">
+
+            <h2>
+                Exportar trajeto
+            </h2>
+
+
+            <button
+                id="csvBtn"
+            >
+                DOWNLOAD CSV
+            </button>
+
+
+            <button
+                id="shpBtn"
+            >
+                DOWNLOAD SHP
+            </button>
+
+
+            <button
+                id="newTrackBtn"
+            >
+                NOVO TRAJETO
+            </button>
+
+        </div>
+
+    </div>
+
 
     <script src="app.js"></script>
+
 </body>
+
 </html>

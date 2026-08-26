@@ -1,419 +1,2002 @@
 // ======================================================
-// VARIÁVEIS GLOBAIS
+// GPS WEB LOGGER
 // ======================================================
-let map;
+
+
+// ======================================================
+// CHAVES DO LOCALSTORAGE
+// ======================================================
+
+const STORAGE_KEY =
+    "gps_web_logger_track";
+
+
+// ======================================================
+// ESTADO
+// ======================================================
+
+let points = [];
+
 let watchId = null;
+
+let recordingInterval = null;
+
+let timerInterval = null;
+
+let lastPosition = null;
+
+let lastPositionReceivedAt = null;
+
+let isRecording = false;
+
 let isPaused = false;
-let routeCoords = [];
-let routeData = []; 
-let currentPolyline;
-let marker;
-let initialLocationMarker;
-let startTime;
+
+let trackId = null;
+
+let startTime = null;
+
+let endTime = null;
+
+let elapsedBeforePause = 0;
+
+let pauseStartTime = null;
+
 let totalDistance = 0;
-let timerInterval;
-let wakeLock = null;
-let currentHeading = 0;
-let routeId = "";
+
+let description = "";
+
+let trackCoordinates = [];
+
+let trackLine = null;
+
+let currentMarker = null;
+
 
 // ======================================================
-// ÍCONES (BÚSSOLA E MARCADOR INICIAL)
+// MAPA
 // ======================================================
-const arrowIcon = L.divIcon({
-    className: 'compass-marker',
-    html: `<svg class="compass-arrow" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                <path d="M20 2 L28 30 L20 24 L12 30 Z" fill="#dc3545" stroke="white" stroke-width="2"/>
-           </svg>`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20]
-});
 
-const initialDotIcon = L.divIcon({
-    className: 'initial-dot-marker',
-    html: `<div style="width: 20px; height: 20px; background: #007bff; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
-});
+const map = L.map("map").setView(
+    [-23.5505, -46.6333],
+    13
+);
 
-// ======================================================
-// FUNÇÕES UTILITÁRIAS
-// ======================================================
-function sanitizeFilename(name) {
-    if (!name) return "sem_descricao";
-    return name
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-zA-Z0-9\s]/g, '')
-        .trim()
-        .replace(/\s+/g, '_');
-}
 
-function generateRouteId() {
-    const date = new Date();
-    const format = (n) => n.toString().padStart(2, '0');
-    return `ROUTE_${date.getFullYear()}${format(date.getMonth()+1)}${format(date.getDate())}${format(date.getHours())}${format(date.getMinutes())}${format(date.getSeconds())}`;
-}
-
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; 
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-}
-
-// ======================================================
-// INICIALIZAÇÃO DO MAPA
-// ======================================================
-function initMap() {
-    map = L.map('map').setView([-15.7801, -47.9292], 4);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
-
-    // Marcador inicial azul assim que o app abre
-    map.locate({setView: true, maxZoom: 16});
-    
-    function onLocationFound(e) {
-        if (initialLocationMarker) map.removeLayer(initialLocationMarker);
-        initialLocationMarker = L.marker(e.latlng, { icon: initialDotIcon }).addTo(map).bindPopup("Você está aqui");
+L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+        maxZoom: 19,
+        attribution:
+            "&copy; OpenStreetMap contributors"
     }
-    map.on('locationfound', onLocationFound);
+).addTo(map);
 
-    loadExternalLayers();
-}
-
-function loadExternalLayers() {
-    const layers = [
-        { file: 'layers/camada_escolas.geojson', color: 'blue' },
-        { file: 'layers/camada_ruas.geojson', color: 'green' }
-    ];
-
-    layers.forEach(layerInfo => {
-        fetch(layerInfo.file)
-            .then(response => {
-                if (!response.ok) throw new Error(`Erro ao carregar ${layerInfo.file}`);
-                return response.json();
-            })
-            .then(data => {
-                L.geoJSON(data, {
-                    style: { color: layerInfo.color, weight: 3, fillOpacity: 0.3 },
-                    pointToLayer: function (feature, latlng) {
-                        return L.circleMarker(latlng, {
-                            radius: 6,
-                            fillColor: layerInfo.color,
-                            color: "#000",
-                            weight: 1,
-                            fillOpacity: 0.8
-                        });
-                    },
-                    onEachFeature: function (feature, layer) {
-                        if (feature.properties) {
-                            let popupContent = '<div class="popup-attrs">';
-                            for (let key in feature.properties) {
-                                popupContent += `<b>${key}:</b> ${feature.properties[key]}<br>`;
-                            }
-                            popupContent += '</div>';
-                            layer.bindPopup(popupContent);
-                        }
-                    }
-                }).addTo(map);
-            })
-            .catch(error => console.warn(error.message));
-    });
-}
 
 // ======================================================
-// WAKE LOCK E BÚSSOLA
+// CAMADAS PREDEFINIDAS
 // ======================================================
-async function requestWakeLock() {
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
-        }
-    } catch (err) { console.log('Wake Lock não suportado'); }
-}
 
-function requestCompassPermission() {
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission()
-            .then(permissionState => {
-                if (permissionState === 'granted') {
-                    window.addEventListener('deviceorientation', handleDeviceOrientation);
-                }
-            })
-            .catch(console.error);
-    } else if (typeof DeviceOrientationEvent !== 'undefined') {
-        window.addEventListener('deviceorientationabsolute', handleDeviceOrientation, true);
-        window.addEventListener('deviceorientation', handleDeviceOrientation, true);
-    }
-}
+const predefinedLayers = [
 
-function handleDeviceOrientation(event) {
-    let heading = null;
-    if (event.webkitCompassHeading) {
-        heading = event.webkitCompassHeading;
-    } else if (event.absolute === true || event.alpha !== null) {
-        heading = 360 - event.alpha;
+    {
+        name: "Pontos de referência",
+        file: "./layers/edificacoes.geojson"
+    },
+    {
+        name: "Edificações de referência",
+        file: "./layers/edificacoes_poligono.geojson"
+    },
+    {
+        name: "Polígono",
+        file: "./layers/roteiro.geojson"
     }
 
-    if (heading !== null) {
-        currentHeading = heading;
-        updateMarkerRotation();
-    }
-}
+];
 
-function updateMarkerRotation() {
-    if (marker) {
-        const markerEl = marker.getElement();
-        if (markerEl) {
-            const arrow = markerEl.querySelector('.compass-arrow');
-            if (arrow) {
-                arrow.style.transform = `rotate(${currentHeading}deg)`;
-            }
-        }
-    }
-}
 
 // ======================================================
-// EVENTOS DOS BOTÕES
+// ELEMENTOS HTML
 // ======================================================
-document.getElementById('btn-start').addEventListener('click', () => {
-    if (watchId) return;
-    
-    routeCoords = [];
-    routeData = [];
-    totalDistance = 0;
-    startTime = Date.now();
-    isPaused = false;
-    routeId = generateRouteId();
 
-    if (currentPolyline) map.removeLayer(currentPolyline);
-    if (marker) { map.removeLayer(marker); marker = null; }
-    if (initialLocationMarker) map.removeLayer(initialLocationMarker);
+const statusElement =
+    document.getElementById("status");
 
-    requestWakeLock();
-    requestCompassPermission();
+const durationElement =
+    document.getElementById("duration");
 
-    watchId = navigator.geolocation.watchPosition(
-        (position) => {
-            if (isPaused) return;
+const distanceElement =
+    document.getElementById("distance");
 
-            const { latitude, longitude, accuracy } = position.coords;
-            
-            if (routeCoords.length > 0) {
-                const lastCoord = routeCoords[routeCoords.length - 1];
-                totalDistance += calculateDistance(lastCoord.lat, lastCoord.lng, latitude, longitude);
-            }
+const accuracyElement =
+    document.getElementById("accuracy");
 
-            routeCoords.push({ lat: latitude, lng: longitude });
-            
-            routeData.push({ 
-                id: routeId, 
-                lat: latitude, 
-                lon: longitude, 
-                timestamp: Date.now(), 
-                accuracy: accuracy 
-            });
+const startBtn =
+    document.getElementById("startBtn");
 
-            document.getElementById('distance').innerText = totalDistance.toFixed(0);
-            document.getElementById('accuracy').innerText = accuracy.toFixed(0);
-            
-            if (currentPolyline) map.removeLayer(currentPolyline);
-            currentPolyline = L.polyline(routeCoords, {color: 'red', weight: 4}).addTo(map);
-            
-            if (!marker) {
-                marker = L.marker([latitude, longitude], { icon: arrowIcon }).addTo(map);
-            } else {
-                marker.setLatLng([latitude, longitude]);
-            }
-            updateMarkerRotation();
-            
-            map.setView([latitude, longitude], 18);
-        },
-        (error) => alert("Erro ao obter localização: " + error.message),
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+const pauseBtn =
+    document.getElementById("pauseBtn");
+
+const stopBtn =
+    document.getElementById("stopBtn");
+
+const metadataPanel =
+    document.getElementById("metadataPanel");
+
+const exportPanel =
+    document.getElementById("exportPanel");
+
+const descriptionInput =
+    document.getElementById("description");
+
+const saveMetadataBtn =
+    document.getElementById("saveMetadataBtn");
+
+const csvBtn =
+    document.getElementById("csvBtn");
+
+const shpBtn =
+    document.getElementById("shpBtn");
+
+const newTrackBtn =
+    document.getElementById("newTrackBtn");
+
+
+// ======================================================
+// SALVAR ESTADO
+// ======================================================
+
+function saveState() {
+
+    const state = {
+
+        points:
+            points,
+
+        trackId:
+            trackId,
+
+        startTime:
+            startTime,
+
+        endTime:
+            endTime,
+
+        elapsedBeforePause:
+            elapsedBeforePause,
+
+        pauseStartTime:
+            pauseStartTime,
+
+        totalDistance:
+            totalDistance,
+
+        description:
+            description,
+
+        trackCoordinates:
+            trackCoordinates,
+
+        isRecording:
+            isRecording,
+
+        isPaused:
+            isPaused
+
+    };
+
+
+    localStorage.setItem(
+
+        STORAGE_KEY,
+
+        JSON.stringify(state)
+
     );
 
-    timerInterval = setInterval(() => {
-        if (watchId && !isPaused) {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            document.getElementById('time').innerText = elapsed;
-        }
-    }, 1000);
+}
 
-    document.getElementById('btn-start').disabled = true;
-    document.getElementById('btn-pause').disabled = false;
-    document.getElementById('btn-stop').disabled = false;
-});
-
-document.getElementById('btn-pause').addEventListener('click', (e) => {
-    isPaused = !isPaused;
-    e.target.innerText = isPaused ? "RESUME" : "PAUSE";
-});
-
-document.getElementById('btn-stop').addEventListener('click', () => {
-    if (navigator.geolocation && watchId) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        clearInterval(timerInterval);
-        
-        if (wakeLock) {
-            wakeLock.release();
-            wakeLock = null;
-        }
-        document.getElementById('stop-modal').classList.remove('hidden');
-    }
-});
-
-document.getElementById('btn-continue').addEventListener('click', () => {
-    document.getElementById('stop-modal').classList.add('hidden');
-    document.getElementById('result-modal').classList.remove('hidden');
-});
 
 // ======================================================
-// DOWNLOADS
+// RESTAURAR ESTADO
 // ======================================================
-document.getElementById('btn-csv').addEventListener('click', () => {
-    let csv = "id,dia,hora,timestamp,lat,lon,accuracy\n";
-    routeData.forEach(row => {
-        const date = new Date(row.timestamp);
-        const dia = date.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        const hora = date.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        csv += `${row.id},${dia},${hora},${row.timestamp},${row.lat},${row.lon},${row.accuracy}\n`;
-    });
-    
-    const desc = sanitizeFilename(document.getElementById('route-description').value);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `trajeto_${desc}_${routeId}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-});
 
-document.getElementById('btn-shp').addEventListener('click', async () => {
-    if (routeData.length < 2) {
-        alert("Caminhe um pouco para registrar pelo menos 2 pontos antes de baixar o SHP.");
+function restoreState() {
+
+    const savedState =
+        localStorage.getItem(
+            STORAGE_KEY
+        );
+
+
+    if (!savedState) {
+
         return;
+
     }
 
-    const rawDesc = document.getElementById('route-description').value || "Sem_descricao";
-    const desc = sanitizeFilename(rawDesc);
-    
-    const coordinatesArray = routeData.map(p => [Number(p.lon), Number(p.lat)]);
-    
-    const geojson = {
-        type: "FeatureCollection",
-        features: [{
-            type: "Feature",
-            geometry: { 
-                type: "LineString", 
-                coordinates: coordinatesArray 
-            },
-            properties: { 
-                id: routeId, 
-                descricao: rawDesc 
-            }
-        }]
-    };
-    
+
     try {
-        if (typeof shpwrite === 'undefined') {
-            alert("Erro: Biblioteca SHP não carregou. Verifique a pasta libs.");
-            return;
+
+        const state =
+            JSON.parse(
+                savedState
+            );
+
+
+        points =
+            state.points || [];
+
+
+        trackId =
+            state.trackId;
+
+
+        startTime =
+            state.startTime;
+
+
+        endTime =
+            state.endTime;
+
+
+        elapsedBeforePause =
+            state.elapsedBeforePause || 0;
+
+
+        pauseStartTime =
+            state.pauseStartTime;
+
+
+        totalDistance =
+            state.totalDistance || 0;
+
+
+        description =
+            state.description || "";
+
+
+        trackCoordinates =
+            state.trackCoordinates || [];
+
+
+        isRecording =
+            false;
+
+
+        isPaused =
+            false;
+
+
+        // RESTAURAR LINHA
+
+        if (
+
+            trackCoordinates.length > 0
+
+        ) {
+
+            trackLine =
+                L.polyline(
+                    trackCoordinates
+                ).addTo(map);
+
+
+            map.fitBounds(
+                trackLine.getBounds(),
+                {
+                    padding: [40, 40]
+                }
+            );
+
         }
 
-        // SOLUÇÃO DEFINITIVA DO SHP: Usar outputType: "blob"
-        const zipBlob = await shpwrite.zip(geojson, {
-            folder: "trajeto",
-            filename: `trajeto_${desc}_${routeId}`,
-            outputType: "blob"
-        });
 
-        const url = window.URL.createObjectURL(zipBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `trajeto_${desc}_${routeId}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        
-        setTimeout(() => {
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }, 100);
-        
-    } catch (err) {
-        console.error("Erro SHP:", err);
-        alert("Erro ao gerar SHP: " + err.message);
-    }
-});
+        // SE HOUVER TRAJETO FINALIZADO
 
-document.getElementById('btn-new').addEventListener('click', () => {
-    document.getElementById('result-modal').classList.add('hidden');
-    document.getElementById('btn-start').disabled = false;
-    document.getElementById('btn-pause').disabled = true;
-    document.getElementById('btn-pause').innerText = "PAUSE";
-    document.getElementById('btn-stop').disabled = true;
-    document.getElementById('time').innerText = '0';
-    document.getElementById('distance').innerText = '0';
-    document.getElementById('accuracy').innerText = '-';
-    document.getElementById('route-description').value = '';
-    if (currentPolyline) map.removeLayer(currentPolyline);
-    if (marker) { map.removeLayer(marker); marker = null; }
-    
-    // Reativa o marcador azul inicial
-    map.locate({setView: true, maxZoom: 16});
-});
+        if (
 
-// ======================================================
-// FORÇAR TAMANHO DO MAPA (SOLUÇÃO DEFINITIVA)
-// ======================================================
-function resizeMap() {
-    const topBar = document.getElementById('top-bar');
-    const bottomBar = document.getElementById('bottom-bar');
-    const mapDiv = document.getElementById('map');
-    
-    if (topBar && bottomBar && mapDiv) {
-        // Pega a altura real das barras em pixels
-        const topHeight = topBar.offsetHeight;
-        const bottomHeight = bottomBar.offsetHeight;
-        
-        // Calcula a altura exata que o mapa deve ter
-        const mapHeight = window.innerHeight - topHeight - bottomHeight;
-        
-        // Aplica a altura exata em pixels no mapa
-        mapDiv.style.height = `${mapHeight}px`;
-        mapDiv.style.top = `${topHeight}px`;
-        
-        // Avisa o Leaflet que o tamanho mudou para ele se redesenhar
-        if (map) {
-            map.invalidateSize();
+            endTime !== null
+
+        ) {
+
+            statusElement.textContent =
+                "Trajeto restaurado";
+
+
+            startBtn.disabled =
+                false;
+
+            pauseBtn.disabled =
+                true;
+
+            stopBtn.disabled =
+                true;
+
         }
+
+
+        updateInterface();
+
     }
+
+    catch (error) {
+
+        console.error(
+            "Erro ao restaurar trajeto:",
+            error
+        );
+
+    }
+
+}
+
+
+// ======================================================
+// LIMPAR ESTADO
+// ======================================================
+
+function clearState() {
+
+    localStorage.removeItem(
+        STORAGE_KEY
+    );
+
+}
+
+
+// ======================================================
+// CARREGAR CAMADAS GEOJSON
+// ======================================================
+
+async function loadPredefinedLayers() {
+
+    for (
+
+        const layerConfig
+        of predefinedLayers
+
+    ) {
+
+        try {
+
+            const response =
+                await fetch(
+                    layerConfig.file
+                );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+
+                    `HTTP ${response.status}: ` +
+                    layerConfig.file
+
+                );
+
+            }
+
+
+            const geojson =
+                await response.json();
+
+
+            L.geoJSON(
+
+                geojson,
+
+                {
+
+                    style: {
+
+                        weight: 2,
+
+                        fillOpacity: 0.15
+
+                    },
+
+
+                    pointToLayer:
+
+                        function (
+                            feature,
+                            latlng
+                        ) {
+
+                            return L.circleMarker(
+
+                                latlng,
+
+                                {
+
+                                    radius: 7,
+
+                                    weight: 2,
+
+                                    fillOpacity: 0.8
+
+                                }
+
+                            );
+
+                        },
+
+
+                    onEachFeature:
+
+                        function (
+                            feature,
+                            leafletLayer
+                        ) {
+
+                            if (
+
+                                feature.properties
+
+                            ) {
+
+                                let popupContent =
+                                    "<div class='featurePopup'>";
+
+
+                                for (
+
+                                    const [key, value]
+
+                                    of Object.entries(
+
+                                        feature.properties
+
+                                    )
+
+                                ) {
+
+                                    popupContent += `
+
+                                        <div class="popupRow">
+
+                                            <strong>
+                                                ${key}
+                                            </strong>
+
+                                            ${value}
+
+                                        </div>
+
+                                    `;
+
+                                }
+
+
+                                popupContent +=
+                                    "</div>";
+
+
+                                leafletLayer.bindPopup(
+                                    popupContent
+                                );
+
+                            }
+
+                        }
+
+                }
+
+            ).addTo(map);
+
+
+            console.log(
+                `Camada carregada: ${layerConfig.name}`
+            );
+
+        }
+
+        catch (error) {
+
+            console.error(
+
+                `Erro ao carregar ${layerConfig.name}:`,
+
+                error
+
+            );
+
+        }
+
+    }
+
+}
+
+
+// ======================================================
+// LOCALIZAR USUÁRIO
+// ======================================================
+
+function locateUser() {
+
+    if (!navigator.geolocation) {
+
+        statusElement.textContent =
+            "Geolocalização não suportada.";
+
+        return;
+
+    }
+
+
+    navigator.geolocation.getCurrentPosition(
+
+        updateCurrentPosition,
+
+        handlePositionError,
+
+        {
+
+            enableHighAccuracy: true,
+
+            maximumAge: 0,
+
+            timeout: 10000
+
+        }
+
+    );
+
+}
+
+
+// ======================================================
+// ATUALIZAR POSIÇÃO
+// ======================================================
+
+function updateCurrentPosition(
+    position
+) {
+
+    const latitude =
+        position.coords.latitude;
+
+    const longitude =
+        position.coords.longitude;
+
+    const accuracy =
+        position.coords.accuracy;
+
+
+    const latlng = [
+        latitude,
+        longitude
+    ];
+
+
+    accuracyElement.textContent =
+        `± ${accuracy.toFixed(1)} m`;
+
+
+    if (
+
+        currentMarker === null
+
+    ) {
+
+        currentMarker =
+            L.marker(
+                latlng
+            ).addTo(map);
+
+
+        if (
+
+            trackCoordinates.length === 0
+
+        ) {
+
+            map.setView(
+                latlng,
+                17
+            );
+
+        }
+
+    }
+
+    else {
+
+        currentMarker.setLatLng(
+            latlng
+        );
+
+    }
+
+}
+
+
+// ======================================================
+// RECEBER GPS
+// ======================================================
+
+function receivePosition(
+    position
+) {
+
+    lastPosition =
+        position;
+
+
+    lastPositionReceivedAt =
+        Date.now();
+
+
+    updateCurrentPosition(
+        position
+    );
+
+}
+
+
+// ======================================================
+// START
+// ======================================================
+
+function startRecording() {
+
+    // NOVO TRAJETO
+
+    points = [];
+
+    trackCoordinates = [];
+
+    totalDistance = 0;
+
+    description = "";
+
+    elapsedBeforePause = 0;
+
+    pauseStartTime = null;
+
+    startTime = Date.now();
+
+    endTime = null;
+
+    lastPosition = null;
+
+    lastPositionReceivedAt = null;
+
+
+    if (
+
+        trackLine !== null
+
+    ) {
+
+        map.removeLayer(
+            trackLine
+        );
+
+        trackLine = null;
+
+    }
+
+
+    trackId =
+
+        "track_" +
+
+        new Date(
+            startTime
+        )
+
+        .toISOString()
+
+        .replace(
+            /[:.]/g,
+            "-"
+        );
+
+
+    isRecording =
+        true;
+
+    isPaused =
+        false;
+
+
+    statusElement.textContent =
+        "Gravando...";
+
+
+    startBtn.disabled =
+        true;
+
+    pauseBtn.disabled =
+        false;
+
+    stopBtn.disabled =
+        false;
+
+
+    startGPSWatch();
+
+    startRecordingInterval();
+
+    startTimer();
+
+    saveState();
+
+}
+
+
+// ======================================================
+// REGISTRAR A CADA SEGUNDO
+// ======================================================
+
+function recordSecond() {
+
+    if (
+
+        !isRecording ||
+
+        isPaused
+
+    ) {
+
+        return;
+
+    }
+
+
+    const now =
+        new Date();
+
+
+    const dia =
+
+        now.toLocaleDateString(
+            "sv-SE"
+        );
+
+
+    const hora =
+
+        now.toLocaleTimeString(
+            "pt-BR",
+            {
+                hour12: false
+            }
+        );
+
+
+    let latitude = null;
+
+    let longitude = null;
+
+    let accuracy = null;
+
+    let gpsAvailable = 0;
+
+
+    const positionIsRecent =
+
+        lastPosition !== null &&
+
+        lastPositionReceivedAt !== null &&
+
+        (
+
+            Date.now() -
+
+            lastPositionReceivedAt
+
+        )
+
+        <= 2000;
+
+
+    if (positionIsRecent) {
+
+        latitude =
+            lastPosition.coords.latitude;
+
+        longitude =
+            lastPosition.coords.longitude;
+
+        accuracy =
+            lastPosition.coords.accuracy;
+
+        gpsAvailable =
+            1;
+
+
+        const previousValidPoint =
+            findPreviousValidPoint();
+
+
+        if (
+
+            previousValidPoint !== null
+
+        ) {
+
+            totalDistance +=
+
+                calculateDistance(
+
+                    previousValidPoint.latitude,
+
+                    previousValidPoint.longitude,
+
+                    latitude,
+
+                    longitude
+
+                );
+
+        }
+
+
+        updateTrack(
+            latitude,
+            longitude
+        );
+
+    }
+
+
+    points.push({
+
+        id:
+            points.length + 1,
+
+        track_id:
+            trackId,
+
+        timestamp:
+            now.getTime(),
+
+        dia:
+            dia,
+
+        hora:
+            hora,
+
+        latitude:
+            latitude,
+
+        longitude:
+            longitude,
+
+        accuracy_m:
+            accuracy,
+
+        gps_available:
+            gpsAvailable
+
+    });
+
+
+    updateInterface();
+
+    saveState();
+
+}
+
+
+// ======================================================
+// ÚLTIMO PONTO VÁLIDO
+// ======================================================
+
+function findPreviousValidPoint() {
+
+    for (
+
+        let i =
+            points.length - 1;
+
+        i >= 0;
+
+        i--
+
+    ) {
+
+        if (
+
+            points[i]
+                .gps_available === 1
+
+        ) {
+
+            return points[i];
+
+        }
+
+    }
+
+
+    return null;
+
+}
+
+
+// ======================================================
+// LINHA DO TRAJETO
+// ======================================================
+
+function updateTrack(
+    latitude,
+    longitude
+) {
+
+    const latlng = [
+        latitude,
+        longitude
+    ];
+
+
+    trackCoordinates.push(
+        latlng
+    );
+
+
+    if (
+
+        trackLine === null
+
+    ) {
+
+        trackLine =
+            L.polyline(
+                trackCoordinates
+            ).addTo(map);
+
+    }
+
+    else {
+
+        trackLine.setLatLngs(
+            trackCoordinates
+        );
+
+    }
+
+}
+
+
+// ======================================================
+// GPS WATCH
+// ======================================================
+
+function startGPSWatch() {
+
+    watchId =
+
+        navigator.geolocation.watchPosition(
+
+            receivePosition,
+
+            handlePositionError,
+
+            {
+
+                enableHighAccuracy:
+                    true,
+
+                maximumAge:
+                    0,
+
+                timeout:
+                    10000
+
+            }
+
+        );
+
+}
+
+
+function stopGPSWatch() {
+
+    if (
+
+        watchId !== null
+
+    ) {
+
+        navigator.geolocation.clearWatch(
+            watchId
+        );
+
+        watchId = null;
+
+    }
+
+}
+
+
+// ======================================================
+// INTERVALO
+// ======================================================
+
+function startRecordingInterval() {
+
+    recordingInterval =
+
+        setInterval(
+
+            recordSecond,
+
+            1000
+
+        );
+
+}
+
+
+function stopRecordingInterval() {
+
+    if (
+
+        recordingInterval !== null
+
+    ) {
+
+        clearInterval(
+            recordingInterval
+        );
+
+        recordingInterval =
+            null;
+
+    }
+
+}
+
+
+// ======================================================
+// PAUSE
+// ======================================================
+
+function pauseRecording() {
+
+    if (!isRecording) {
+
+        return;
+
+    }
+
+
+    if (!isPaused) {
+
+        isPaused =
+            true;
+
+
+        pauseStartTime =
+            Date.now();
+
+
+        statusElement.textContent =
+            "Gravação pausada";
+
+
+        pauseBtn.textContent =
+            "RESUME";
+
+
+        stopGPSWatch();
+
+        stopRecordingInterval();
+
+    }
+
+    else {
+
+        isPaused =
+            false;
+
+
+        elapsedBeforePause +=
+
+            Date.now() -
+
+            pauseStartTime;
+
+
+        pauseStartTime =
+            null;
+
+
+        statusElement.textContent =
+            "Gravando...";
+
+
+        pauseBtn.textContent =
+            "PAUSE";
+
+
+        startGPSWatch();
+
+        startRecordingInterval();
+
+    }
+
+
+    saveState();
+
+}
+
+
+// ======================================================
+// STOP
+// ======================================================
+
+function stopRecording() {
+
+    if (!isRecording) {
+
+        return;
+
+    }
+
+
+    endTime =
+        Date.now();
+
+
+    if (
+
+        isPaused &&
+
+        pauseStartTime !== null
+
+    ) {
+
+        elapsedBeforePause +=
+
+            endTime -
+
+            pauseStartTime;
+
+    }
+
+
+    isRecording =
+        false;
+
+    isPaused =
+        false;
+
+
+    stopGPSWatch();
+
+    stopRecordingInterval();
+
+    stopTimer();
+
+
+    statusElement.textContent =
+        "Trajeto finalizado";
+
+
+    startBtn.disabled =
+        false;
+
+    pauseBtn.disabled =
+        true;
+
+    stopBtn.disabled =
+        true;
+
+
+    pauseBtn.textContent =
+        "PAUSE";
+
+
+    saveState();
+
+
+    metadataPanel.classList.remove(
+        "hidden"
+    );
+
+}
+
+
+// ======================================================
+// TIMER
+// ======================================================
+
+function startTimer() {
+
+    stopTimer();
+
+
+    timerInterval =
+
+        setInterval(
+
+            updateInterface,
+
+            1000
+
+        );
+
+}
+
+
+function stopTimer() {
+
+    if (
+
+        timerInterval !== null
+
+    ) {
+
+        clearInterval(
+            timerInterval
+        );
+
+        timerInterval =
+            null;
+
+    }
+
+}
+
+
+// ======================================================
+// TEMPO DECORRIDO
+// ======================================================
+
+function getElapsedTime() {
+
+    if (!startTime) {
+
+        return 0;
+
+    }
+
+
+    const now =
+        endTime || Date.now();
+
+
+    let elapsed =
+        now - startTime;
+
+
+    elapsed -=
+        elapsedBeforePause;
+
+
+    if (
+
+        isPaused &&
+
+        pauseStartTime !== null
+
+    ) {
+
+        elapsed -=
+
+            Date.now() -
+
+            pauseStartTime;
+
+    }
+
+
+    return elapsed;
+
+}
+
+
+// ======================================================
+// INTERFACE
+// ======================================================
+
+function updateInterface() {
+
+    durationElement.textContent =
+
+        formatDuration(
+
+            getElapsedTime()
+
+        );
+
+
+    if (
+
+        totalDistance < 1000
+
+    ) {
+
+        distanceElement.textContent =
+
+            `${totalDistance.toFixed(1)} m`;
+
+    }
+
+    else {
+
+        distanceElement.textContent =
+
+            `${(
+
+                totalDistance / 1000
+
+            ).toFixed(2)} km`;
+
+    }
+
+}
+
+
+// ======================================================
+// FORMATAR TEMPO
+// ======================================================
+
+function formatDuration(
+    milliseconds
+) {
+
+    const totalSeconds =
+
+        Math.floor(
+            milliseconds / 1000
+        );
+
+
+    const hours =
+
+        Math.floor(
+            totalSeconds / 3600
+        );
+
+
+    const minutes =
+
+        Math.floor(
+
+            (
+                totalSeconds % 3600
+            ) / 60
+
+        );
+
+
+    const seconds =
+        totalSeconds % 60;
+
+
+    return [
+
+        String(hours)
+            .padStart(2, "0"),
+
+        String(minutes)
+            .padStart(2, "0"),
+
+        String(seconds)
+            .padStart(2, "0")
+
+    ].join(":");
+
+}
+
+
+// ======================================================
+// DISTÂNCIA - HAVERSINE
+// ======================================================
+
+function calculateDistance(
+    lat1,
+    lon1,
+    lat2,
+    lon2
+) {
+
+    const R =
+        6371000;
+
+
+    const toRadians =
+        value =>
+            value *
+            Math.PI /
+            180;
+
+
+    const dLat =
+        toRadians(
+            lat2 - lat1
+        );
+
+
+    const dLon =
+        toRadians(
+            lon2 - lon1
+        );
+
+
+    const a =
+
+        Math.sin(
+            dLat / 2
+        ) ** 2
+
+        +
+
+        Math.cos(
+            toRadians(lat1)
+        )
+
+        *
+
+        Math.cos(
+            toRadians(lat2)
+        )
+
+        *
+
+        Math.sin(
+            dLon / 2
+        ) ** 2;
+
+
+    const c =
+
+        2 *
+
+        Math.atan2(
+
+            Math.sqrt(a),
+
+            Math.sqrt(1 - a)
+
+        );
+
+
+    return R * c;
+
+}
+
+
+// ======================================================
+// ERRO GPS
+// ======================================================
+
+function handlePositionError(
+    error
+) {
+
+    console.error(
+        "Erro GPS:",
+        error
+    );
+
+
+    if (isRecording) {
+
+        statusElement.textContent =
+            "GPS temporariamente indisponível";
+
+    }
+
+    else {
+
+        statusElement.textContent =
+            "Não foi possível obter localização.";
+
+    }
+
+}
+
+
+// ======================================================
+// SALVAR DESCRIÇÃO
+// ======================================================
+
+function saveMetadata() {
+
+    description =
+        descriptionInput.value.trim();
+
+
+    saveState();
+
+
+    metadataPanel.classList.add(
+        "hidden"
+    );
+
+
+    exportPanel.classList.remove(
+        "hidden"
+    );
+
+}
+
+
+// ======================================================
+// EXPORTAR CSV
+// ======================================================
+
+function exportCSV() {
+
+    if (
+
+        points.length === 0
+
+    ) {
+
+        alert(
+            "Nenhum registro disponível."
+        );
+
+        return;
+
+    }
+
+
+    const headers = [
+
+        "id",
+
+        "track_id",
+
+        "timestamp",
+
+        "dia",
+
+        "hora",
+
+        "latitude",
+
+        "longitude",
+
+        "accuracy_m",
+
+        "gps_available"
+
+    ];
+
+
+    const rows =
+
+        points.map(
+
+            point =>
+
+                headers.map(
+
+                    header => {
+
+                        const value =
+                            point[header] ?? "";
+
+
+                        return `"${
+
+                            String(value)
+
+                            .replace(
+                                /"/g,
+                                '""'
+                            )
+
+                        }"`;
+
+                    }
+
+                )
+
+                .join(",")
+
+        );
+
+
+    const csv = [
+
+        headers.join(","),
+
+        ...rows
+
+    ].join("\n");
+
+
+    downloadFile(
+
+        csv,
+
+        createFilename("csv"),
+
+        "text/csv;charset=utf-8"
+
+    );
+
+}
+
+
+// ======================================================
+// EXPORTAR SHAPEFILE
+// ======================================================
+
+async function exportSHP() {
+
+    const validPoints =
+
+        points.filter(
+
+            point =>
+
+                point.gps_available === 1
+
+        );
+
+
+    if (
+
+        validPoints.length === 0
+
+    ) {
+
+        alert(
+            "Nenhum ponto GPS válido."
+        );
+
+        return;
+
+    }
+
+
+    const geojson = {
+
+        type:
+            "FeatureCollection",
+
+
+        features:
+
+            validPoints.map(
+
+                point => ({
+
+                    type:
+                        "Feature",
+
+
+                    geometry: {
+
+                        type:
+                            "Point",
+
+
+                        coordinates: [
+
+                            point.longitude,
+
+                            point.latitude
+
+                        ]
+
+                    },
+
+
+                    properties: {
+
+                        id:
+                            point.id,
+
+                        track_id:
+                            point.track_id,
+
+                        timestamp:
+                            point.timestamp,
+
+                        dia:
+                            point.dia,
+
+                        hora:
+                            point.hora,
+
+                        accuracy_m:
+                            point.accuracy_m,
+
+                        gps_avail:
+                            point.gps_available
+
+                    }
+
+                })
+
+            )
+
+    };
+
+
+    try {
+
+        const zipBlob =
+
+            await shpwrite.zip(
+
+                geojson,
+
+                {
+
+                    folder:
+                        "gps_track",
+
+                    filename:
+                        trackId,
+
+                    outputType:
+                        "blob"
+
+                }
+
+            );
+
+
+        downloadBlob(
+
+            zipBlob,
+
+            createFilename("zip")
+
+        );
+
+    }
+
+    catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        alert(
+            "Erro ao gerar Shapefile."
+        );
+
+    }
+
 }
 
 // ======================================================
-// INICIAR APLICAÇÃO
+// CRIAR NOME DO ARQUIVO
 // ======================================================
-initMap();
 
-// Espera a página carregar 100% e calcula o tamanho do mapa
-window.addEventListener('load', function() {
-    setTimeout(resizeMap, 100);
-});
+function createFilename(extension) {
 
-// Recalcula se a barra do navegador do celular sumir/aparecer
-window.addEventListener('resize', function() {
-    setTimeout(resizeMap, 100);
-});
+    const date = new Date(startTime)
+        .toISOString()
+        .replace(/[:.]/g, "-")
+        .replace("T", "_")
+        .replace("Z", "");
 
-// Recalcula se a pessoa girar o celular
-window.addEventListener('orientationchange', function() {
-    setTimeout(resizeMap, 100);
-});
+    // Pega diretamente o valor atual da descrição
+    const currentDescription =
+        descriptionInput.value.trim() || description;
+
+    const safeDescription = currentDescription
+
+        ? currentDescription
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .substring(0, 50)
+
+        : "trajeto";
+
+    return `gps_${date}_${safeDescription}.${extension}`;
+
+}
+
+// ======================================================
+// DOWNLOAD
+// ======================================================
+
+function downloadFile(
+    content,
+    filename,
+    type
+) {
+
+    const blob =
+
+        new Blob(
+
+            [content],
+
+            {
+                type:
+                    type
+            }
+
+        );
+
+
+    downloadBlob(
+        blob,
+        filename
+    );
+
+}
+
+
+function downloadBlob(
+    blob,
+    filename
+) {
+
+    const url =
+        URL.createObjectURL(
+            blob
+        );
+
+
+    const link =
+        document.createElement(
+            "a"
+        );
+
+
+    link.href =
+        url;
+
+
+    link.download =
+        filename;
+
+
+    document.body.appendChild(
+        link
+    );
+
+
+    link.click();
+
+
+    document.body.removeChild(
+        link
+    );
+
+
+    setTimeout(
+
+        function () {
+
+            URL.revokeObjectURL(
+                url
+            );
+
+        },
+
+        1000
+
+    );
+
+}
+
+
+// ======================================================
+// NOVO TRAJETO
+// ======================================================
+
+function newTrack() {
+
+    exportPanel.classList.add(
+        "hidden"
+    );
+
+
+    descriptionInput.value =
+        "";
+
+
+    clearState();
+
+
+    points = [];
+
+    trackCoordinates = [];
+
+    totalDistance = 0;
+
+    trackId = null;
+
+    startTime = null;
+
+    endTime = null;
+
+    description = "";
+
+
+    if (
+
+        trackLine !== null
+
+    ) {
+
+        map.removeLayer(
+            trackLine
+        );
+
+        trackLine = null;
+
+    }
+
+
+    durationElement.textContent =
+        "00:00:00";
+
+
+    distanceElement.textContent =
+        "0 m";
+
+
+    statusElement.textContent =
+        "Pronto para iniciar";
+
+}
+
+
+// ======================================================
+// EVENTOS
+// ======================================================
+
+startBtn.addEventListener(
+    "click",
+    startRecording
+);
+
+
+pauseBtn.addEventListener(
+    "click",
+    pauseRecording
+);
+
+
+stopBtn.addEventListener(
+    "click",
+    stopRecording
+);
+
+
+saveMetadataBtn.addEventListener(
+    "click",
+    saveMetadata
+);
+
+
+csvBtn.addEventListener(
+    "click",
+    exportCSV
+);
+
+
+shpBtn.addEventListener(
+    "click",
+    exportSHP
+);
+
+
+newTrackBtn.addEventListener(
+    "click",
+    newTrack
+);
+
+
+// ======================================================
+// INICIALIZAÇÃO
+// ======================================================
+
+loadPredefinedLayers();
+
+restoreState();
+
+locateUser();

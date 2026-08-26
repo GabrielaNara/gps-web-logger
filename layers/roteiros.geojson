@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "roteiros",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": 1, "nome": "geo-fau", "data": 2026.0 }, "geometry": { "type": "MultiLineString", "coordinates": [ [ [ -46.723811540657785, -23.5629567449418 ], [ -46.723565260407781, -23.562456177344551 ], [ -46.729989962581804, -23.559384024634731 ], [ -46.730354029038331, -23.560159430977617 ], [ -46.730187522173644, -23.560201636508005 ] ] ] } }
+]
+}
