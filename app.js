@@ -80,15 +80,15 @@ const predefinedLayers = [
 
     {
         name: "Pontos de referência",
-        file: "./layers/edificacoes.geojson"
+        file: "./layers/edificacao.geojson"
     },
     {
         name: "Edificações de referência",
-        file: "./layers/edificacoes_poligono.geojson"
+        file: "./layers/edificacao_poligono.geojson"
     },
     {
         name: "Polígono",
-        file: "./layers/roteiro.geojson"
+        file: "./layers/roteiros.geojson"
     }
 
 ];
